@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedbackForge Pro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        h1 { color: #333; margin-bottom: 5px; }
+        .controls, .presets-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .presets-container { background: #e9ecef; padding: 15px; }
+        button {
+            padding: 10px 20px; font-size: 16px; color: white; border: none;
+            border-radius: 5px; cursor: pointer; margin: 5px; transition: background 0.3s;
+        }
+        button:disabled { background: #cccccc !important; cursor: not-allowed; opacity: 0.6; }
+        #startBtn { background: #4CAF50; }
+        #stopBtn { background: #f44336; }
+        #resetBtn { background: #FF9800; }
+        
+        .preset-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; }
+        select, input[type="text"] { padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        #loadPresetBtn { background: #2196F3; padding: 8px 16px; }
+        #savePresetBtn { background: #9C27B0; padding: 8px 16px; }
+        #deletePresetBtn { background: #607D8B; padding: 8px 16px; }
+
+        .slider-container, .toggle-container { margin: 15px 0; }
+        .slider-container label, .toggle-container label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .slider-container input[type="range"] { width: 100%; }
+        .value-display { text-align: center; font-size: 14px; color: #666; }
+        .toggle-container { display: flex; align-items: center; justify-content: space-between; }
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 34px;
+        }
+        .toggle-slider:before {
+            position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .toggle-slider { background-color: #4CAF50; }
+        input:checked + .toggle-slider:before { transform: translateX(26px); }
+        .toggle-label { margin-left: 10px; font-size: 14px; }
+        
+        .visualizer-container { position: relative; width: 100%; height: 300px; margin: 20px 0; }
+        canvas { width: 100%; height: 100%; background: #111; border-radius: 5px; display: block; }
+        .visualizer-label {
+            position: absolute; color: #fff; font-size: 12px; background: rgba(0, 0, 0, 0.5);
+            padding: 2px 5px; border-radius: 3px; pointer-events: none;
+        }
+        .label-top { top: 5px; left: 50%; transform: translateX(-50%); }
+        .label-bottom { bottom: 5px; left: 50%; transform: translateX(-50%); }
+        .label-left { left: 5px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+        .label-right { right: 5px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+        
+        .frequency-selector { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 15px 0; }
+        .freq-btn {
+            padding: 6px 10px; background: #2196F3; color: white; border: none;
+            border-radius: 5px; cursor: pointer; transition: background 0.3s;
+            font-size: 11px; min-width: 60px;
+        }
+        .freq-btn.active { background: #0b7dda; font-weight: bold; box-shadow: 0 0 5px rgba(11, 125, 218, 0.8); }
+        .range-display { margin-top: 10px; font-size: 14px; color: #333; text-align: left; max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border-radius: 5px; }
+        .freq-group { display: flex; flex-direction: column; margin: 10px 0; }
+        .freq-group-title { font-weight: bold; margin-bottom: 5px; color: #555; font-size: 13px; }
+        
+        .mode-selector { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; background: #f9f9f9; padding: 10px; border-radius: 5px; }
+        .mode-btn { padding: 8px 16px; background: #555; border-radius: 5px; }
+        .mode-btn.active { background: #4CAF50; font-weight: bold; }
+        
+        .noise-type-selector { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+        .noise-type-btn { padding: 8px 16px; background: #777; border-radius: 5px; }
+        .noise-type-btn.active { background: #2196F3; font-weight: bold; }
+        
+        .lfo-controls { background: #f0f8ff; padding: 10px; border-radius: 5px; margin: 15px 0; }
+        .lfo-waveform-selector { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .lfo-waveform-btn { padding: 6px 12px; background: #999; font-size: 12px; border-radius: 5px;}
+        .lfo-waveform-btn.active { background: #9C27B0; font-weight: bold; }
+
+        .sweep-settings { background: #fff3e0; padding: 10px; border-radius: 5px; margin: 15px 0; }
+        .status { margin-top: 10px; font-size: 14px; color: #d32f2f; font-weight: bold; min-height: 20px; }
+        .info { color: #666; font-size: 14px; margin-top: 20px; text-align: left; padding: 10px; background: white; border-radius: 5px;}
+    </style>
+</head>
+<body>
+    <h1>FeedbackForge Pro</h1>
+    <p>Generate feedback using <strong>Sine Waves</strong>, <strong>Noise</strong>, or dynamic <strong>Frequency Sweeps</strong>. Now with Zero-Dropout Dynamic Routing, Native LFO, and Saturation.</p>
+    
+    <!-- Presets Section -->
+    <div class="presets-container">
+        <div style="font-weight: bold; margin-bottom: 10px; color: #333;">Saved Configurations</div>
+        <div class="preset-controls">
+            <select id="presetSelect">
+                <option value="">-- Factory & Saved Presets --</option>
+            </select>
+            <button id="loadPresetBtn">Load</button>
+            <input type="text" id="presetNameInput" placeholder="New preset name...">
+            <button id="savePresetBtn">Save</button>
+            <button id="deletePresetBtn">Delete</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div>
+            <button id="startBtn">Start Audio</button>
+            <button id="stopBtn" class="stop" disabled>Stop Audio</button>
+            <button id="resetBtn">Reset System</button>
+        </div>
+        <div class="status" id="status"></div>
+        
+        <div class="mode-selector">
+            <div style="margin-bottom: 10px; font-weight: bold; width: 100%;"><strong>Signal Source:</strong></div>
+            <button class="mode-btn active" id="sineModeBtn" data-mode="sine">Sine Waves</button>
+            <button class="mode-btn" id="noiseModeBtn" data-mode="noise">Noise Filters</button>
+            <button class="mode-btn" id="sweepModeBtn" data-mode="sweep">Frequency Sweep</button>
+        </div>
+        
+        <div class="noise-type-selector" id="noiseTypeSelector" style="display: none;">
+            <button class="noise-type-btn active" id="whiteNoiseBtn" data-noise="white">White Noise</button>
+            <button class="noise-type-btn" id="pinkNoiseBtn" data-noise="pink">Pink Noise</button>
+            <button class="noise-type-btn" id="brownNoiseBtn" data-noise="brown">Brown Noise</button>
+        </div>
+
+        <div class="sweep-settings" id="sweepSettings" style="display: none;">
+            <div class="slider-container">
+                <label for="sweepTimeInput">Sweep Duration (Seconds): <span id="sweepTimeValue">5.0</span></label>
+                <input type="range" id="sweepTimeInput" min="0.5" max="20" value="5.0" step="0.5">
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">Sweeps back and forth continuously between your <strong>lowest</strong> and <strong>highest</strong> selected active bands.</p>
+            </div>
+        </div>
+        
+        <div class="lfo-controls" id="lfoControls">
+            <div class="toggle-container">
+                <label>LFO (Master Volume Modulation - Native Web Audio):</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="lfoToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label" id="lfoLabel">Disabled</span>
+            </div>
+            <div id="lfoSettings" style="display: none;">
+                <div class="lfo-waveform-selector">
+                    <button class="lfo-waveform-btn active" id="sineWaveformBtn" data-waveform="sine">Sine</button>
+                    <button class="lfo-waveform-btn" id="squareWaveformBtn" data-waveform="square">Square</button>
+                    <button class="lfo-waveform-btn" id="triangleWaveformBtn" data-waveform="triangle">Triangle</button>
+                    <button class="lfo-waveform-btn" id="sawWaveformBtn" data-waveform="sawtooth">Sawtooth</button>
+                </div>
+                <div class="slider-container">
+                    <label for="lfoPeriodInput">LFO Cycle Length (seconds): <span id="lfoPeriodValue">2.0</span></label>
+                    <input type="range" id="lfoPeriodInput" min="0.1" max="10" value="2.0" step="0.1">
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; font-weight: bold; color: #444;">Active Frequency Bands (Zero-Dropout Dynamic Routing):</div>
+        <div class="frequency-selector">
+            <div class="freq-group">
+                <div class="freq-group-title">Sub-Bass (20-60Hz)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button class="freq-btn active" data-freq="20">20Hz</button>
+                    <button class="freq-btn" data-freq="30">30Hz</button>
+                    <button class="freq-btn" data-freq="40">40Hz</button>
+                    <button class="freq-btn" data-freq="50">50Hz</button>
+                    <button class="freq-btn" data-freq="60">60Hz</button>
+                </div>
+            </div>
+            <div class="freq-group">
+                <div class="freq-group-title">Bass (80-250Hz)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button class="freq-btn active" data-freq="80">80Hz</button>
+                    <button class="freq-btn active" data-freq="100">100Hz</button>
+                    <button class="freq-btn active" data-freq="125">125Hz</button>
+                    <button class="freq-btn active" data-freq="150">150Hz</button>
+                    <button class="freq-btn active" data-freq="200">200Hz</button>
+                    <button class="freq-btn active" data-freq="250">250Hz</button>
+                </div>
+            </div>
+            <div class="freq-group">
+                <div class="freq-group-title">Midrange (300Hz-2kHz)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button class="freq-btn" data-freq="300">300Hz</button>
+                    <button class="freq-btn active" data-freq="500">500Hz</button>
+                    <button class="freq-btn" data-freq="600">600Hz</button>
+                    <button class="freq-btn active" data-freq="1000">1kHz</button>
+                    <button class="freq-btn" data-freq="1500">1.5kHz</button>
+                    <button class="freq-btn" data-freq="2000">2kHz</button>
+                </div>
+            </div>
+            <div class="freq-group">
+                <div class="freq-group-title">Treble (3kHz-8kHz)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button class="freq-btn" data-freq="3000">3kHz</button>
+                    <button class="freq-btn" data-freq="4000">4kHz</button>
+                    <button class="freq-btn" data-freq="6000">6kHz</button>
+                    <button class="freq-btn" data-freq="8000">8kHz</button>
+                </div>
+            </div>
+            <div class="freq-group">
+                <div class="freq-group-title">Ultra-High (10kHz-24kHz)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button class="freq-btn" data-freq="10000">10kHz</button>
+                    <button class="freq-btn" data-freq="12000">12kHz</button>
+                    <button class="freq-btn" data-freq="16000">16kHz</button>
+                    <button class="freq-btn" data-freq="20000">20kHz</button>
+                    <button class="freq-btn" data-freq="24000">24kHz</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="range-display" id="rangeDisplay">Selected frequency ranges will appear here.</div>
+        
+        <div class="slider-container" style="margin-top: 30px;">
+            <label for="gainSlider">Master Gain: <span id="gainValue" class="value-display">0.5</span></label>
+            <input type="range" id="gainSlider" min="0.1" max="0.9" value="0.5" step="0.05">
+        </div>
+        
+        <div class="toggle-container">
+            <label>Filter Q (Resonance Width):</label>
+            <label class="toggle-switch">
+                <input type="checkbox" id="qToggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label" id="qLabel">Narrow (High Q)</span>
+        </div>
+        
+        <div class="slider-container">
+            <label for="feedbackSlider">Feedback Amount: <span id="feedbackValue" class="value-display">0.3</span></label>
+            <input type="range" id="feedbackSlider" min="0.0" max="0.8" value="0.3" step="0.05">
+        </div>
+
+        <div class="slider-container">
+            <label for="saturationSlider">Feedback Saturation (Distortion): <span id="saturationValue" class="value-display">10</span></label>
+            <input type="range" id="saturationSlider" min="0" max="100" value="10" step="1">
+        </div>
+    </div>
+    
+    <div class="visualizer-container">
+        <canvas id="visualizer"></canvas>
+        <div class="visualizer-label label-top">Volume: High</div>
+        <div class="visualizer-label label-bottom">Volume: Low</div>
+        <div class="visualizer-label label-left" id="freqLowLabel">0Hz</div>
+        <div class="visualizer-label label-right" id="freqHighLabel">24000Hz</div>
+    </div>
+    
+    <div class="info">
+        <h3>Feature Guide</h3>
+        <ul>
+            <li><strong>Zero-Dropout Routing:</strong> Add/remove frequencies while playing without audio stutters.</li>
+            <li><strong>Saturation:</strong> Adds analog-style harmonic distortion to the feedback path.</li>
+            <li><strong>Stereo Spatialization:</strong> Frequencies are automatically panned across the stereo field based on pitch.</li>
+            <li><strong>Native LFO:</strong> Volume modulation is now hardware-accelerated via Web Audio for zero-latency drift.</li>
+        </ul>
+        <p><em>Note: Audio feedback is actively restricted by built-in limiters and a delay node to protect your hearing and prevent context crashes.</em></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ----- STATE & GLOBAL VARS -----
+            let audioCtx = null;
+            let masterCompressor = null;
+            let gainNode = null;
+            let feedbackGain = null;
+            let feedbackDelay = null; // Prevents infinite math loop
+            let shaper = null; // Saturation
+            let analyser = null;
+            
+            // Source Nodes
+            let noiseSource = null;
+            let sweepOsc = null;
+            let activeNodes = {}; // Dynamic dictionary: { freq: { osc, filter, panner } }
+
+            let isPlaying = false;
+            let dataArray;
+            let canvasCtx;
+            let animationId;
+            let sweepAnimationId = null;
+            
+            // Native LFO Nodes
+            let lfoOsc = null;
+            let lfoGain = null;
+            
+            // Core Config State
+            let currentMode = 'sine';
+            let noiseType = 'white';
+            let selectedFreqs = [20, 80, 100, 125, 150, 200, 250, 500, 1000];
+            let isNarrowQ = true;
+            let saturationAmount = 10;
+            
+            // Sweep State
+            let sweepTime = 5.0;
+            let sweepStartTime = 0;
+            
+            // LFO State
+            let lfoEnabled = false;
+            let lfoWaveform = 'sine';
+            let lfoPeriod = 2.0; 
+            
+            const factoryPresets = {
+                "Factory: Classic Sine": { mode: "sine", noiseType: "white", freqs: [20, 100, 500, 1000], qNarrow: true, gain: 0.5, feedback: 0.3, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 10 },
+                "Factory: Rumble Noise": { mode: "noise", noiseType: "brown", freqs: [20, 30, 40, 50, 60, 80], qNarrow: false, gain: 0.7, feedback: 0.5, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 3.0, sweepTime: 5.0, sat: 40 },
+                "Factory: Full Range Sweep": { mode: "sweep", noiseType: "white", freqs: [20, 20000], qNarrow: true, gain: 0.6, feedback: 0.4, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 10.0, sat: 20 }
+            };
+
+            // ----- DOM ELEMENTS -----
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const presetSelect = document.getElementById('presetSelect');
+            const loadPresetBtn = document.getElementById('loadPresetBtn');
+            const savePresetBtn = document.getElementById('savePresetBtn');
+            const deletePresetBtn = document.getElementById('deletePresetBtn');
+            const presetNameInput = document.getElementById('presetNameInput');
+            const modeBtns = document.querySelectorAll('.mode-btn');
+            const noiseTypeSelector = document.getElementById('noiseTypeSelector');
+            const noiseBtns = document.querySelectorAll('.noise-type-btn');
+            const sweepSettings = document.getElementById('sweepSettings');
+            const sweepTimeInput = document.getElementById('sweepTimeInput');
+            const sweepTimeValue = document.getElementById('sweepTimeValue');
+            const freqButtons = document.querySelectorAll('.freq-btn');
+            const rangeDisplay = document.getElementById('rangeDisplay');
+            const gainSlider = document.getElementById('gainSlider');
+            const feedbackSlider = document.getElementById('feedbackSlider');
+            const saturationSlider = document.getElementById('saturationSlider');
+            const qToggle = document.getElementById('qToggle');
+            const gainValue = document.getElementById('gainValue');
+            const feedbackValue = document.getElementById('feedbackValue');
+            const saturationValue = document.getElementById('saturationValue');
+            const qLabel = document.getElementById('qLabel');
+            const lfoToggle = document.getElementById('lfoToggle');
+            const lfoLabel = document.getElementById('lfoLabel');
+            const lfoSettingsDiv = document.getElementById('lfoSettings');
+            const lfoBtns = document.querySelectorAll('.lfo-waveform-btn');
+            const lfoPeriodInput = document.getElementById('lfoPeriodInput');
+            const lfoPeriodValue = document.getElementById('lfoPeriodValue');
+            const visualizer = document.getElementById('visualizer');
+            const statusDisplay = document.getElementById('status');
+
+            // ----- HELPER FUNCTIONS -----
+            function makeDistortionCurve(amount) {
+                let k = amount, n = 44100, curve = new Float32Array(n), deg = Math.PI / 180;
+                for (let i = 0; i < n; i++) {
+                    let x = i * 2 / n - 1;
+                    curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+                }
+                return curve;
+            }
+
+            function resizeCanvas() {
+                const rect = visualizer.getBoundingClientRect();
+                visualizer.width = rect.width * window.devicePixelRatio;
+                visualizer.height = rect.height * window.devicePixelRatio;
+            }
+            window.addEventListener('resize', () => { if(canvasCtx) resizeCanvas(); });
+
+            // ----- PRESET MANAGEMENT -----
+            function loadPresetsFromStorage() {
+                let userPresets = JSON.parse(localStorage.getItem('fbForgePresets')) || {};
+                presetSelect.innerHTML = '<option value="">-- Select Preset --</option>';
+                Object.keys(factoryPresets).forEach(name => presetSelect.add(new Option(name, name)));
+                const userKeys = Object.keys(userPresets);
+                if (userKeys.length > 0) {
+                    const group = document.createElement('optgroup');
+                    group.label = "User Presets";
+                    userKeys.forEach(name => group.appendChild(new Option(name, name)));
+                    presetSelect.appendChild(group);
+                }
+            }
+            
+            function syncUI() {
+                modeBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-mode') === currentMode));
+                noiseTypeSelector.style.display = currentMode === 'noise' ? 'flex' : 'none';
+                sweepSettings.style.display = currentMode === 'sweep' ? 'block' : 'none';
+                noiseBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-noise') === noiseType));
+                freqButtons.forEach(btn => {
+                    const f = parseInt(btn.getAttribute('data-freq'));
+                    btn.classList.toggle('active', selectedFreqs.includes(f));
+                });
+                gainValue.textContent = gainSlider.value;
+                feedbackValue.textContent = feedbackSlider.value;
+                saturationValue.textContent = saturationSlider.value;
+                qToggle.checked = isNarrowQ;
+                qLabel.textContent = isNarrowQ ? 'Narrow (High Q)' : 'Wide (Low Q)';
+                lfoToggle.checked = lfoEnabled;
+                lfoLabel.textContent = lfoEnabled ? 'Enabled' : 'Disabled';
+                lfoSettingsDiv.style.display = lfoEnabled ? 'block' : 'none';
+                lfoBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-waveform') === lfoWaveform));
+                lfoPeriodInput.value = lfoPeriod;
+                lfoPeriodValue.textContent = lfoPeriod.toFixed(1);
+                sweepTimeInput.value = sweepTime;
+                sweepTimeValue.textContent = sweepTime.toFixed(1);
+                updateRangeDisplay();
+            }
+
+            savePresetBtn.addEventListener('click', () => {
+                const name = presetNameInput.value.trim();
+                if(!name) return alert("Please enter a name for your preset.");
+                if(factoryPresets[name]) return alert("Cannot overwrite a factory preset.");
+                const presetObj = {
+                    mode: currentMode, noiseType, freqs: [...selectedFreqs], qNarrow: isNarrowQ,
+                    gain: parseFloat(gainSlider.value), feedback: parseFloat(feedbackSlider.value),
+                    lfoEnabled, lfoWaveform, lfoPeriod, sweepTime, sat: parseFloat(saturationSlider.value)
+                };
+                let userPresets = JSON.parse(localStorage.getItem('fbForgePresets')) || {};
+                userPresets[name] = presetObj;
+                localStorage.setItem('fbForgePresets', JSON.stringify(userPresets));
+                presetNameInput.value = '';
+                loadPresetsFromStorage();
+                presetSelect.value = name;
+                statusDisplay.textContent = `Preset "${name}" saved!`;
+                setTimeout(() => statusDisplay.textContent='', 3000);
+            });
+
+            loadPresetBtn.addEventListener('click', () => {
+                const name = presetSelect.value;
+                if(!name) return;
+                let presetData = factoryPresets[name] || (JSON.parse(localStorage.getItem('fbForgePresets')) || {})[name];
+                if (presetData) {
+                    currentMode = presetData.mode || 'sine';
+                    noiseType = presetData.noiseType || 'white';
+                    selectedFreqs = presetData.freqs || [];
+                    isNarrowQ = presetData.qNarrow !== undefined ? presetData.qNarrow : true;
+                    gainSlider.value = presetData.gain || 0.5;
+                    feedbackSlider.value = presetData.feedback !== undefined ? presetData.feedback : 0.3;
+                    saturationSlider.value = presetData.sat !== undefined ? presetData.sat : 10;
+                    lfoEnabled = presetData.lfoEnabled || false;
+                    lfoWaveform = presetData.lfoWaveform || 'sine';
+                    lfoPeriod = presetData.lfoPeriod || 2.0;
+                    sweepTime = presetData.sweepTime || 5.0;
+                    
+                    syncUI();
+                    if(isPlaying) { stop(); initAudioGraph(); }
+                    statusDisplay.textContent = `Loaded preset: ${name}`;
+                    setTimeout(() => statusDisplay.textContent='', 3000);
+                }
+            });
+            
+            deletePresetBtn.addEventListener('click', () => {
+                const name = presetSelect.value;
+                if(!name || factoryPresets[name]) return alert("Cannot delete factory presets.");
+                let userPresets = JSON.parse(localStorage.getItem('fbForgePresets')) || {};
+                if(userPresets[name]) {
+                    delete userPresets[name];
+                    localStorage.setItem('fbForgePresets', JSON.stringify(userPresets));
+                    loadPresetsFromStorage();
+                    statusDisplay.textContent = `Deleted preset: ${name}`;
+                    setTimeout(() => statusDisplay.textContent='', 3000);
+                }
+            });
+
+            // ----- DYNAMIC NODE MANAGEMENT (Zero-Dropout) -----
+            function addFrequencyNode(freq) {
+                if (!audioCtx || activeNodes[freq]) return;
+                
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = freq;
+                filter.Q.value = isNarrowQ ? 20 : 1;
+                
+                const panner = audioCtx.createStereoPanner();
+                // Spatialize: 20Hz = -0.8 (Left), 24000Hz = 0.8 (Right)
+                panner.pan.value = Math.max(-0.8, Math.min(0.8, (Math.log(freq) - Math.log(1000)) / 4));
+                
+                filter.connect(panner);
+                panner.connect(gainNode);
+                feedbackGain.connect(filter); // Feedback route
+                
+                let osc = null;
+                if (currentMode === 'sine') {
+                    osc = audioCtx.createOscillator();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    osc.connect(filter);
+                    osc.start();
+                } else if (currentMode === 'noise' && noiseSource) {
+                    noiseSource.connect(filter);
+                }
+                
+                activeNodes[freq] = { osc, filter, panner };
+            }
+
+            function removeFrequencyNode(freq) {
+                if (!activeNodes[freq]) return;
+                const node = activeNodes[freq];
+                try { 
+                    if(node.osc) node.osc.stop(); 
+                    node.filter.disconnect();
+                    node.panner.disconnect();
+                    if (currentMode === 'noise' && noiseSource) noiseSource.disconnect(node.filter);
+                } catch(e) {}
+                delete activeNodes[freq];
+            }
+
+            function syncActiveNodes() {
+                if (!isPlaying) return;
+                
+                // Remove unselected
+                Object.keys(activeNodes).forEach(f => {
+                    if (!selectedFreqs.includes(parseInt(f))) removeFrequencyNode(parseInt(f));
+                });
+                
+                // Add selected
+                selectedFreqs.forEach(f => {
+                    if (!activeNodes[f] && f <= audioCtx.sampleRate / 2) addFrequencyNode(f);
+                });
+            }
+
+            // ----- CORE AUDIO INIT -----
+            function initAudioContext() {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AudioContext();
+                    
+                    masterCompressor = audioCtx.createDynamicsCompressor();
+                    masterCompressor.threshold.value = -3;
+                    masterCompressor.knee.value = 10;
+                    masterCompressor.ratio.value = 15;
+                    masterCompressor.attack.value = 0.005;
+                    masterCompressor.release.value = 0.1;
+                    masterCompressor.connect(audioCtx.destination);
+                }
+                resizeCanvas();
+            }
+
+            function resetSystem() {
+                stop();
+                Object.keys(activeNodes).forEach(f => removeFrequencyNode(parseInt(f)));
+                if (noiseSource) { try { noiseSource.disconnect(); } catch(e) {} }
+                if (sweepOsc) { try { sweepOsc.disconnect(); } catch(e) {} }
+                if (gainNode) { try { gainNode.disconnect(); } catch(e) {} }
+                if (feedbackGain) { try { feedbackGain.disconnect(); } catch(e) {} }
+                if (feedbackDelay) { try { feedbackDelay.disconnect(); } catch(e) {} }
+                if (shaper) { try { shaper.disconnect(); } catch(e) {} }
+                if (analyser) { try { analyser.disconnect(); } catch(e) {} }
+
+                noiseSource = null;
+                sweepOsc = null;
+                gainNode = null;
+                feedbackGain = null;
+                feedbackDelay = null;
+                shaper = null;
+                analyser = null;
+
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusDisplay.textContent = '';
+                if (animationId) cancelAnimationFrame(animationId);
+                if (sweepAnimationId) cancelAnimationFrame(sweepAnimationId);
+                if (canvasCtx) canvasCtx.clearRect(0, 0, visualizer.width, visualizer.height);
+            }
+
+            async function initAudioGraph() {
+                resetSystem();
+                try {
+                    initAudioContext();
+                    if (audioCtx.state === 'suspended') await audioCtx.resume();
+                } catch (e) {
+                    return statusDisplay.textContent = 'Error: Could not resume audio. ' + e.message;
+                }
+
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = parseFloat(gainSlider.value);
+                
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                // Feedback Path with Delay and Saturation
+                feedbackGain = audioCtx.createGain();
+                feedbackGain.gain.value = parseFloat(feedbackSlider.value);
+                
+                feedbackDelay = audioCtx.createDelay(1.0);
+                feedbackDelay.delayTime.value = 0.05; // 50ms delay to prevent math loop crashes
+                
+                shaper = audioCtx.createWaveShaper();
+                shaper.curve = makeDistortionCurve(saturationAmount);
+                
+                // Global Routing
+                gainNode.connect(analyser);
+                analyser.connect(masterCompressor);
+                
+                // Feedback Loop Routing: analyser -> shaper -> delay -> gain -> (back to filters)
+                analyser.connect(shaper);
+                shaper.connect(feedbackDelay);
+                feedbackDelay.connect(feedbackGain);
+
+                // Setup Source-Specific Graph
+                if (currentMode === 'sweep') {
+                    sweepOsc = audioCtx.createOscillator();
+                    let sweepFilter = audioCtx.createBiquadFilter();
+                    let sweepPanner = audioCtx.createStereoPanner();
+                    
+                    sweepOsc.type = 'sine';
+                    sweepFilter.type = 'bandpass';
+                    sweepFilter.Q.value = isNarrowQ ? 20 : 1;
+                    sweepPanner.pan.value = 0; // Center sweep
+                    
+                    sweepOsc.connect(sweepFilter);
+                    sweepFilter.connect(sweepPanner);
+                    sweepPanner.connect(gainNode);
+                    feedbackGain.connect(sweepFilter); // Feedback into sweep filter
+                    
+                    activeNodes['sweep'] = { osc: sweepOsc, filter: sweepFilter, panner: sweepPanner };
+                } 
+                else if (currentMode === 'noise') {
+                    const bufferSize = 2 * audioCtx.sampleRate;
+                    let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const noiseData = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) noiseData[i] = Math.random() * 2 - 1;
+                    
+                    noiseSource = audioCtx.createBufferSource();
+                    noiseSource.buffer = noiseBuffer;
+                    noiseSource.loop = true;
+                    
+                    let targetSource = noiseSource;
+                    if (noiseType !== 'white') {
+                        const colorFilter = audioCtx.createBiquadFilter();
+                        colorFilter.type = 'lowpass';
+                        colorFilter.frequency.value = noiseType === 'pink' ? 10000 : 5000;
+                        colorFilter.Q.value = 0.5;
+                        noiseSource.connect(colorFilter);
+                        targetSource = colorFilter;
+                    }
+                    
+                    // Initialize frequency nodes dynamically
+                    selectedFreqs.forEach(freq => {
+                        if (freq <= audioCtx.sampleRate / 2) {
+                            addFrequencyNode(freq);
+                            // addFrequencyNode handles connecting targetSource to filter internally
+                            // but since noise is shared, we do it here:
+                            targetSource.connect(activeNodes[freq].filter);
+                        }
+                    });
+                } 
+                else { // Sine Waves
+                    selectedFreqs.forEach(freq => {
+                        if (freq <= audioCtx.sampleRate / 2) addFrequencyNode(freq);
+                    });
+                }
+
+                if (!canvasCtx) canvasCtx = visualizer.getContext('2d');
+
+                try {
+                    if (currentMode === 'sweep') sweepOsc.start();
+                    else if (currentMode === 'noise') noiseSource.start();
+                    
+                    isPlaying = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    sweepStartTime = performance.now();
+                    drawVisualizer();
+                    if (lfoEnabled) startLFO();
+                    if (currentMode === 'sweep') updateSweepEngine();
+                } catch (e) {
+                    statusDisplay.textContent = 'Error starting audio: ' + e.message;
+                    resetSystem();
+                }
+            }
+
+            function stop() {
+                if (isPlaying) {
+                    if (noiseSource) { try { noiseSource.stop(); } catch(e){} }
+                    if (sweepOsc) { try { sweepOsc.stop(); } catch(e){} }
+                    Object.keys(activeNodes).forEach(f => { if(activeNodes[f].osc) try { activeNodes[f].osc.stop(); } catch(e){} });
+                    
+                    isPlaying = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    stopLFO();
+                    if (animationId) cancelAnimationFrame(animationId);
+                    if (sweepAnimationId) cancelAnimationFrame(sweepAnimationId);
+                }
+            }
+
+            // ----- NATIVE LFO (Hardware Accelerated) -----
+            function startLFO() {
+                if (!audioCtx || lfoOsc) return;
+                lfoOsc = audioCtx.createOscillator();
+                lfoGain = audioCtx.createGain();
+                lfoOsc.type = lfoWaveform;
+                lfoOsc.frequency.value = 1 / lfoPeriod;
+                
+                // Setup depth: base gain is half, depth is half
+                const masterVal = parseFloat(gainSlider.value);
+                gainNode.gain.value = masterVal / 2;
+                lfoGain.gain.value = masterVal / 2;
+                
+                lfoOsc.connect(lfoGain);
+                lfoGain.connect(gainNode.gain);
+                lfoOsc.start();
+            }
+
+            function stopLFO() {
+                if (lfoOsc) {
+                    try { lfoOsc.stop(); } catch(e){}
+                    lfoOsc.disconnect();
+                    lfoGain.disconnect();
+                    lfoOsc = null;
+                    lfoGain = null;
+                    // Restore full gain
+                    if (gainNode) gainNode.gain.value = parseFloat(gainSlider.value);
+                }
+            }
+
+            function updateLFOParams() {
+                if (lfoOsc && lfoGain) {
+                    lfoOsc.type = lfoWaveform;
+                    lfoOsc.frequency.setTargetAtTime(1 / lfoPeriod, audioCtx.currentTime, 0.01);
+                    const masterVal = parseFloat(gainSlider.value);
+                    gainNode.gain.setTargetAtTime(masterVal / 2, audioCtx.currentTime, 0.01);
+                    lfoGain.gain.setTargetAtTime(masterVal / 2, audioCtx.currentTime, 0.01);
+                }
+            }
+
+            // ----- ENGINES -----
+            function updateSweepEngine() {
+                if (!isPlaying || currentMode !== 'sweep' || !sweepOsc) return;
+                const now = performance.now();
+                const elapsedSeconds = (now - sweepStartTime) / 1000;
+                const phase = (elapsedSeconds % (sweepTime * 2)) / (sweepTime * 2);
+                const progress = phase < 0.5 ? phase * 2 : 2 - (phase * 2);
+                
+                let minFreq = selectedFreqs.length > 0 ? Math.min(...selectedFreqs) : 20;
+                let maxFreq = selectedFreqs.length > 0 ? Math.max(...selectedFreqs) : 20000;
+                if (minFreq === maxFreq) { minFreq = 20; maxFreq = 20000; }
+                if (maxFreq > audioCtx.sampleRate / 2) maxFreq = audioCtx.sampleRate / 2 - 100;
+                
+                const minLog = Math.log(minFreq);
+                const maxLog = Math.log(maxFreq);
+                const currentFreq = Math.exp(minLog + progress * (maxLog - minLog));
+                
+                try {
+                    sweepOsc.frequency.setTargetAtTime(currentFreq, audioCtx.currentTime, 0.01);
+                    if (activeNodes['sweep']) activeNodes['sweep'].filter.frequency.setTargetAtTime(currentFreq, audioCtx.currentTime, 0.01);
+                } catch(e){}
+                sweepAnimationId = requestAnimationFrame(updateSweepEngine);
+            }
+
+            function drawVisualizer() {
+                if (!isPlaying || !audioCtx || !analyser) return;
+                const WIDTH = visualizer.width; const HEIGHT = visualizer.height;
+                try { analyser.getByteFrequencyData(dataArray); } catch (e) { stop(); return; }
+                
+                // Fade background for smooth trailing effect
+                canvasCtx.fillStyle = 'rgba(17, 17, 17, 0.2)';
+                canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+                
+                const barWidth = WIDTH / analyser.frequencyBinCount;
+                const freqPerBin = audioCtx.sampleRate / analyser.frequencyBinCount;
+                
+                for (let i = 0; i < analyser.frequencyBinCount; i++) {
+                    const barHeight = (dataArray[i] / 255) * HEIGHT;
+                    const freq = i * freqPerBin;
+                    let highlight = false;
+                    if (currentMode !== 'sweep') {
+                        selectedFreqs.forEach(f => {
+                            const bw = f / (isNarrowQ ? 20 : 1);
+                            if (freq >= f - bw/2 && freq <= f + bw/2) highlight = true;
+                        });
+                    }
+                    canvasCtx.fillStyle = highlight ? `rgba(255, 255, 0, 0.8)` : `rgba(${barHeight + 50}, 50, 80, 0.6)`;
+                    canvasCtx.fillRect(i * barWidth, HEIGHT - barHeight, barWidth, barHeight);
+                }
+                
+                if (currentMode === 'sweep' && sweepOsc) {
+                    const currentSweepFreq = sweepOsc.frequency.value;
+                    const bin = Math.round(currentSweepFreq / freqPerBin);
+                    const xPos = bin * barWidth;
+                    canvasCtx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+                    canvasCtx.fillRect(xPos - 4, 0, 4, HEIGHT);
+                }
+                animationId = requestAnimationFrame(drawVisualizer);
+            }
+
+            function updateRangeDisplay() {
+                let txt = '';
+                if (currentMode === 'sweep') {
+                    let min = selectedFreqs.length > 0 ? Math.min(...selectedFreqs) : 20;
+                    let max = selectedFreqs.length > 0 ? Math.max(...selectedFreqs) : 20000;
+                    txt = `<strong>Mode:</strong> Frequency Sweep <br><strong>Range:</strong> ${min}Hz to ${max}Hz | <strong>Duration:</strong> ${sweepTime}s`;
+                } else {
+                    const q = isNarrowQ ? 20 : 1;
+                    txt = `<strong>Mode:</strong> ${currentMode === 'sine' ? 'Sine Waves' : 'Noise ('+noiseType+')'}<br><strong>Active Bands:</strong><br>`;
+                    txt += selectedFreqs.length === 0 ? 'None' : selectedFreqs.map(f => `${f}Hz (Width: ${(f/q).toFixed(1)}Hz)`).join('<br>');
+                }
+                if (lfoEnabled) txt += `<br><strong>LFO Mod:</strong> ${lfoWaveform} (${lfoPeriod}s)`;
+                rangeDisplay.innerHTML = txt;
+            }
+
+            // ----- EVENT LISTENERS -----
+            startBtn.addEventListener('click', initAudioGraph);
+            stopBtn.addEventListener('click', stop);
+            resetBtn.addEventListener('click', resetSystem);
+            
+            modeBtns.forEach(btn => btn.addEventListener('click', function() {
+                currentMode = this.getAttribute('data-mode');
+                syncUI();
+                if (isPlaying) { stop(); initAudioGraph(); } // Mode switch requires rebuild
+            }));
+            
+            noiseBtns.forEach(btn => btn.addEventListener('click', function() {
+                noiseType = this.getAttribute('data-noise');
+                syncUI();
+                if (isPlaying) { stop(); initAudioGraph(); }
+            }));
+
+            // Zero-Dropout Frequency Toggling
+            freqButtons.forEach(btn => btn.addEventListener('click', function() {
+                const f = parseInt(this.getAttribute('data-freq'));
+                if (this.classList.contains('active')) selectedFreqs = selectedFreqs.filter(v => v !== f);
+                else selectedFreqs.push(f);
+                syncUI();
+                if (isPlaying && currentMode !== 'sweep') syncActiveNodes(); 
+            }));
+            
+            sweepTimeInput.addEventListener('input', function() {
+                sweepTime = parseFloat(this.value);
+                sweepTimeValue.textContent = sweepTime.toFixed(1);
+                updateRangeDisplay();
+            });
+
+            lfoToggle.addEventListener('change', function() {
+                lfoEnabled = this.checked;
+                syncUI();
+                if (isPlaying) { if (lfoEnabled) startLFO(); else stopLFO(); }
+            });
+
+            lfoBtns.forEach(btn => btn.addEventListener('click', function() {
+                lfoWaveform = this.getAttribute('data-waveform');
+                syncUI();
+                if (lfoOsc) updateLFOParams();
+            }));
+
+            lfoPeriodInput.addEventListener('input', function() {
+                lfoPeriod = parseFloat(this.value);
+                lfoPeriodValue.textContent = lfoPeriod.toFixed(1);
+                updateRangeDisplay();
+                if (lfoOsc) updateLFOParams();
+            });
+
+            // Smooth Slider Updates
+            gainSlider.addEventListener('input', function() {
+                if (gainNode) {
+                    const val = parseFloat(this.value);
+                    if (lfoEnabled && lfoGain) {
+                        gainNode.gain.setTargetAtTime(val / 2, audioCtx.currentTime, 0.01);
+                        lfoGain.gain.setTargetAtTime(val / 2, audioCtx.currentTime, 0.01);
+                    } else {
+                        gainNode.gain.setTargetAtTime(val, audioCtx.currentTime, 0.01);
+                    }
+                }
+                gainValue.textContent = this.value;
+            });
+
+            feedbackSlider.addEventListener('input', function() {
+                if (feedbackGain) feedbackGain.gain.setTargetAtTime(parseFloat(this.value), audioCtx.currentTime, 0.01);
+                feedbackValue.textContent = this.value;
+            });
+
+            saturationSlider.addEventListener('input', function() {
+                saturationAmount = parseInt(this.value);
+                if (shaper) shaper.curve = makeDistortionCurve(saturationAmount);
+                saturationValue.textContent = this.value;
+            });
+
+            qToggle.addEventListener('change', function() {
+                isNarrowQ = this.checked;
+                if (Object.keys(activeNodes).length > 0) {
+                    Object.values(activeNodes).forEach(node => node.filter.Q.setTargetAtTime(isNarrowQ ? 20 : 1, audioCtx.currentTime, 0.01));
+                }
+                syncUI();
+            });
+
+            // Initial Boot
+            loadPresetsFromStorage();
+            syncUI();
+        });
+    </script>
+</body>
+</html>
