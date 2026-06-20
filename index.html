@@ -102,13 +102,12 @@
     </style>
 </head>
 <body>
-    <!-- Hidden Silent Audio for Mobile Background Play -->
-    <audio id="silentAudio" loop hidden src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
+    <!-- Silent audio element — src set programmatically to a valid WAV -->
+    <audio id="silentAudio" loop hidden></audio>
 
     <h1>Acoustic Sanctuary</h1>
     <p>Targeted acoustic defense, tinnitus masking, and deep focus. Powered by real-time resonant feedback.</p>
     
-    <!-- Presets -->
     <div class="presets-container">
         <div style="font-weight: bold; margin-bottom: 10px; color: #333;">Saved Configurations</div>
         <div class="preset-controls">
@@ -120,7 +119,6 @@
         </div>
     </div>
 
-    <!-- Timer & Export -->
     <div class="timer-container">
         <div class="preset-controls">
             <label for="sleepTimerSelect"><strong>Sleep Timer:</strong></label>
@@ -239,7 +237,6 @@
             </div>
         </div>
 
-        <!-- Manual Frequency Input -->
         <div class="manual-freq-controls">
             <input type="number" id="manualFreqInput" placeholder="Add custom Hz (e.g. 62)" min="20" max="20000">
             <button id="addFreqBtn">Add Frequency</button>
@@ -282,7 +279,7 @@
             <li><strong>Zero-Dropout Routing:</strong> Add/remove frequencies while playing without audio stutters.</li>
             <li><strong>Saturation:</strong> Adds analog-style harmonic distortion to the feedback path.</li>
             <li><strong>Stereo Spatialization:</strong> Frequencies are automatically panned across the stereo field based on pitch.</li>
-            <li><strong>Native LFO:</strong> Volume modulation is hardware-accelerated via Web Audio for zero-latency drift. Instant square wave gating.</li>
+            <li><strong>Native LFO:</strong> All waveforms (including square) use hardware-accelerated OscillatorNodes — no timers, no freeze in background tabs.</li>
             <li><strong>Background Play:</strong> Audio continues when switching tabs or locking your screen.</li>
         </ul>
         <p><em>Note: Audio feedback is actively restricted by built-in limiters and a delay node to protect your hearing and prevent context crashes.</em></p>
@@ -295,14 +292,14 @@
             let masterCompressor = null;
             let gainNode = null;
             let feedbackGain = null;
-            let feedbackDelay = null; // Prevents infinite math loop
-            let shaper = null; // Saturation
+            let feedbackDelay = null;
+            let shaper = null;
             let analyser = null;
             
-            // Source Nodes
             let noiseSource = null;
+            let noiseColorFilter = null; // Keep reference for cleanup
             let sweepOsc = null;
-            let activeNodes = {}; // Dynamic dictionary: { freq: { osc, filter, panner } }
+            let activeNodes = {};
 
             let isPlaying = false;
             let dataArray;
@@ -313,17 +310,17 @@
             let mediaRecorder = null;
             let recordedChunks = [];
             let sleepTimerId = null;
-            let lfoSquareIntervalId = null; // For perfect square LFO
             
-            // Native LFO Nodes
+            // Native LFO Nodes — ALL waveforms use oscillator, no setInterval
             let lfoOsc = null;
             let lfoGain = null;
+            let lfoOffsetNode = null; // ConstantSource for DC offset
             
             // Core Config State
             let currentMode = 'sine';
             let noiseType = 'white';
             let selectedFreqs = [20, 80, 100, 125, 150, 200, 250, 500, 1000];
-            let qValue = 1.0; // Dynamic Q Value
+            let qValue = 1.0;
             let saturationAmount = 10;
             
             // Sweep State
@@ -333,24 +330,17 @@
             // LFO State
             let lfoEnabled = false;
             let lfoWaveform = 'sine';
-            let lfoPeriod = 2.0; 
+            let lfoPeriod = 2.0;
 
-            // Expanded Factory Presets
+            // Factory Presets
             const factoryPresets = {
-                // STANDARD / MASS APPEAL
                 "Standard: Pure White (Static Mask)": { mode: "noise", noiseType: "white", freqs: [20, 50, 100, 500, 1000, 4000, 8000], qValue: 1.0, gain: 0.4, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
                 "Standard: Pure Pink (Focus)": { mode: "noise", noiseType: "pink", freqs: [20, 80, 200, 500, 1000, 3000], qValue: 1.0, gain: 0.5, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
                 "Standard: Deep Brown (Sleep)": { mode: "noise", noiseType: "brown", freqs: [20, 40, 60, 80, 125], qValue: 1.0, gain: 0.6, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
-                
-                // UNIQUE WHITE
                 "White: Tinnitus Sanctuary": { mode: "noise", noiseType: "white", freqs: [6000, 8000], qValue: 20.0, gain: 0.3, feedback: 0.5, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 20 },
                 "White: Brainstorm Sizzle": { mode: "noise", noiseType: "white", freqs: [2000, 3000, 4000], qValue: 15.0, gain: 0.35, feedback: 0.3, lfoEnabled: true, lfoWaveform: "square", lfoPeriod: 0.2, sweepTime: 5.0, sat: 10 },
-
-                // UNIQUE PINK
                 "Pink: Oceanic Pulse": { mode: "noise", noiseType: "pink", freqs: [100, 200, 500], qValue: 10.0, gain: 0.5, feedback: 0.6, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 6.0, sweepTime: 5.0, sat: 30 },
                 "Pink: Rain on Tin Roof": { mode: "noise", noiseType: "pink", freqs: [1000, 2000, 4000], qValue: 12.0, gain: 0.4, feedback: 0.2, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 60 },
-
-                // UNIQUE BROWN
                 "Brown: Sub-Bass Assassin (Neighbor Defense)": { mode: "noise", noiseType: "brown", freqs: [40, 50, 60], qValue: 25.0, gain: 0.7, feedback: 0.7, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 50 },
                 "Brown: Tibetan Singing Bowl": { mode: "noise", noiseType: "brown", freqs: [80, 120, 240], qValue: 18.0, gain: 0.5, feedback: 0.8, lfoEnabled: true, lfoWaveform: "triangle", lfoPeriod: 5.0, sweepTime: 5.0, sat: 40 }
             };
@@ -378,9 +368,9 @@
             const feedbackSlider = document.getElementById('feedbackSlider');
             const saturationSlider = document.getElementById('saturationSlider');
             const qSlider = document.getElementById('qSlider');
-            const gainValue = document.getElementById('gainValue');
-            const feedbackValue = document.getElementById('feedbackValue');
-            const saturationValue = document.getElementById('saturationValue');
+            const gainValueEl = document.getElementById('gainValue');
+            const feedbackValueEl = document.getElementById('feedbackValue');
+            const saturationValueEl = document.getElementById('saturationValue');
             const qValueDisplay = document.getElementById('qValueDisplay');
             const lfoToggle = document.getElementById('lfoToggle');
             const lfoLabel = document.getElementById('lfoLabel');
@@ -393,6 +383,33 @@
             const sleepTimerSelect = document.getElementById('sleepTimerSelect');
             const recordBtn = document.getElementById('recordBtn');
             const silentAudio = document.getElementById('silentAudio');
+
+            // ----- GENERATE VALID SILENT WAV -----
+            // Firefox rejects WAVs with 0-byte data chunks. Build one with actual samples.
+            function buildSilentWavBlob() {
+                const sampleRate = 8000;
+                const numSamples = sampleRate; // 1 second of silence
+                const dataSize = numSamples * 2; // 16-bit PCM
+                const buf = new ArrayBuffer(44 + dataSize);
+                const v = new DataView(buf);
+                function ws(offset, str) { for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i)); }
+                ws(0, 'RIFF');
+                v.setUint32(4, 36 + dataSize, true);
+                ws(8, 'WAVE');
+                ws(12, 'fmt ');
+                v.setUint32(16, 16, true);
+                v.setUint16(20, 1, true);       // PCM
+                v.setUint16(22, 1, true);       // mono
+                v.setUint32(24, sampleRate, true);
+                v.setUint32(28, sampleRate * 2, true);
+                v.setUint16(32, 2, true);       // block align
+                v.setUint16(34, 16, true);      // bits per sample
+                ws(36, 'data');
+                v.setUint32(40, dataSize, true);
+                // Samples are already 0x00 from ArrayBuffer init
+                return new Blob([buf], { type: 'audio/wav' });
+            }
+            silentAudio.src = URL.createObjectURL(buildSilentWavBlob());
 
             // ----- HELPER FUNCTIONS -----
             function makeDistortionCurve(amount) {
@@ -411,17 +428,26 @@
             }
             window.addEventListener('resize', () => { if(canvasCtx) resizeCanvas(); });
 
-            // ----- BACKGROUND PLAY FIXES -----
+            // ----- BACKGROUND PLAY -----
             function engageBackgroundPlay() {
-                silentAudio.play().catch(e => console.log("Silent audio blocked until user interacts."));
+                silentAudio.play().then(() => {
+                    // Success — silent audio is playing
+                }).catch(e => {
+                    console.log("Silent audio blocked until user interacts.");
+                });
                 if ('mediaSession' in navigator) {
                     navigator.mediaSession.metadata = new MediaMetadata({
                         title: 'Acoustic Sanctuary',
                         artist: 'FeedbackForge Pro',
                         album: 'Ambient Masking',
-                        artwork: [{ src: 'https://via.placeholder.com/96/111/fff?text=AS', sizes: '96x96', type: 'image/png' }]
+                        // Use a tiny inline SVG data URI instead of external URL
+                        artwork: [{
+                            src: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" fill="#111"/><text x="48" y="56" text-anchor="middle" fill="#fff" font-size="24" font-family="sans-serif">AS</text></svg>'),
+                            sizes: '96x96',
+                            type: 'image/svg+xml'
+                        }]
                     });
-                    navigator.mediaSession.setActionHandler('play', () => {});
+                    navigator.mediaSession.setActionHandler('play', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); });
                     navigator.mediaSession.setActionHandler('pause', () => {});
                 }
             }
@@ -467,9 +493,9 @@
                     btn.classList.toggle('active', selectedFreqs.includes(f));
                 });
                 
-                gainValue.textContent = gainSlider.value;
-                feedbackValue.textContent = feedbackSlider.value;
-                saturationValue.textContent = saturationSlider.value;
+                gainValueEl.textContent = gainSlider.value;
+                feedbackValueEl.textContent = feedbackSlider.value;
+                saturationValueEl.textContent = saturationSlider.value;
                 qValueDisplay.textContent = qValue.toFixed(1);
                 qSlider.value = qValue;
                 
@@ -547,6 +573,9 @@
                 filter.type = 'bandpass';
                 filter.frequency.value = freq;
                 filter.Q.value = qValue;
+                // Fix: lock channel count to prevent glitch warnings when noise connects to many filters
+                filter.channelCount = 1;
+                filter.channelCountMode = 'explicit';
                 
                 const panner = audioCtx.createStereoPanner();
                 panner.pan.value = Math.max(-0.8, Math.min(0.8, (Math.log(freq) - Math.log(1000)) / 4));
@@ -563,7 +592,9 @@
                     osc.connect(filter);
                     osc.start();
                 } else if (currentMode === 'noise' && noiseSource) {
-                    noiseSource.connect(filter);
+                    // Connect to the final output of the noise chain (colorFilter or noiseSource)
+                    const noiseOutput = noiseColorFilter || noiseSource;
+                    noiseOutput.connect(filter);
                 }
                 activeNodes[freq] = { osc, filter, panner };
             }
@@ -571,11 +602,17 @@
             function removeFrequencyNode(freq) {
                 if (!activeNodes[freq]) return;
                 const node = activeNodes[freq];
-                try { 
-                    if(node.osc) node.osc.stop(); 
+                try {
+                    if(node.osc) node.osc.stop();
+                    // Disconnect noise from this filter if in noise mode
+                    if (currentMode === 'noise') {
+                        const noiseOutput = noiseColorFilter || noiseSource;
+                        if (noiseOutput) try { noiseOutput.disconnect(node.filter); } catch(e) {}
+                    }
                     node.filter.disconnect();
                     node.panner.disconnect();
-                    if (currentMode === 'noise' && noiseSource) noiseSource.disconnect(node.filter);
+                    // Disconnect feedback from this filter
+                    if (feedbackGain) try { feedbackGain.disconnect(node.filter); } catch(e) {}
                 } catch(e) {}
                 delete activeNodes[freq];
             }
@@ -593,8 +630,8 @@
             // ----- CORE AUDIO INIT -----
             function initAudioContext() {
                 if (!audioCtx) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    audioCtx = new AudioContext();
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AC();
                     masterCompressor = audioCtx.createDynamicsCompressor();
                     masterCompressor.threshold.value = -3;
                     masterCompressor.knee.value = 10;
@@ -609,15 +646,16 @@
             function resetSystem() {
                 stop();
                 Object.keys(activeNodes).forEach(f => removeFrequencyNode(parseInt(f)));
-                if (noiseSource) { try { noiseSource.disconnect(); } catch(e) {} }
-                if (sweepOsc) { try { sweepOsc.disconnect(); } catch(e) {} }
+                if (noiseSource) { try { noiseSource.stop(); noiseSource.disconnect(); } catch(e) {} }
+                if (noiseColorFilter) { try { noiseColorFilter.disconnect(); } catch(e) {} }
+                if (sweepOsc) { try { sweepOsc.stop(); sweepOsc.disconnect(); } catch(e) {} }
                 if (gainNode) { try { gainNode.disconnect(); } catch(e) {} }
                 if (feedbackGain) { try { feedbackGain.disconnect(); } catch(e) {} }
                 if (feedbackDelay) { try { feedbackDelay.disconnect(); } catch(e) {} }
                 if (shaper) { try { shaper.disconnect(); } catch(e) {} }
                 if (analyser) { try { analyser.disconnect(); } catch(e) {} }
 
-                noiseSource = null; sweepOsc = null; gainNode = null; 
+                noiseSource = null; noiseColorFilter = null; sweepOsc = null; gainNode = null; 
                 feedbackGain = null; feedbackDelay = null; shaper = null; analyser = null;
 
                 startBtn.disabled = false;
@@ -644,9 +682,12 @@
                 feedbackGain = audioCtx.createGain();
                 feedbackGain.gain.value = parseFloat(feedbackSlider.value);
                 feedbackDelay = audioCtx.createDelay(1.0);
-                feedbackDelay.delayTime.value = 0.05; 
+                feedbackDelay.delayTime.value = 0.05;
                 shaper = audioCtx.createWaveShaper();
                 shaper.curve = makeDistortionCurve(saturationAmount);
+                // Lock shaper channel count too
+                shaper.channelCount = 2;
+                shaper.channelCountMode = 'explicit';
                 
                 gainNode.connect(analyser);
                 analyser.connect(masterCompressor);
@@ -661,6 +702,8 @@
                     sweepOsc.type = 'sine';
                     sweepFilter.type = 'bandpass';
                     sweepFilter.Q.value = qValue;
+                    sweepFilter.channelCount = 1;
+                    sweepFilter.channelCountMode = 'explicit';
                     sweepPanner.pan.value = 0;
                     sweepOsc.connect(sweepFilter);
                     sweepFilter.connect(sweepPanner);
@@ -676,23 +719,21 @@
                     noiseSource = audioCtx.createBufferSource();
                     noiseSource.buffer = noiseBuffer;
                     noiseSource.loop = true;
-                    let targetSource = noiseSource;
+                    noiseColorFilter = null;
                     if (noiseType !== 'white') {
-                        const colorFilter = audioCtx.createBiquadFilter();
-                        colorFilter.type = 'lowpass';
-                        colorFilter.frequency.value = noiseType === 'pink' ? 10000 : 5000;
-                        colorFilter.Q.value = 0.5;
-                        noiseSource.connect(colorFilter);
-                        targetSource = colorFilter;
+                        noiseColorFilter = audioCtx.createBiquadFilter();
+                        noiseColorFilter.type = 'lowpass';
+                        noiseColorFilter.frequency.value = noiseType === 'pink' ? 10000 : 5000;
+                        noiseColorFilter.Q.value = 0.5;
+                        noiseColorFilter.channelCount = 1;
+                        noiseColorFilter.channelCountMode = 'explicit';
+                        noiseSource.connect(noiseColorFilter);
                     }
                     selectedFreqs.forEach(freq => {
-                        if (freq <= audioCtx.sampleRate / 2) {
-                            addFrequencyNode(freq);
-                            targetSource.connect(activeNodes[freq].filter);
-                        }
+                        if (freq <= audioCtx.sampleRate / 2) addFrequencyNode(freq);
                     });
                 } 
-                else { // Sine
+                else {
                     selectedFreqs.forEach(freq => {
                         if (freq <= audioCtx.sampleRate / 2) addFrequencyNode(freq);
                     });
@@ -722,6 +763,7 @@
 
             function stop() {
                 if (isPlaying) {
+                    stopLFO(); // Stop LFO first so gain restores cleanly
                     if (noiseSource) { try { noiseSource.stop(); } catch(e){} }
                     if (sweepOsc) { try { sweepOsc.stop(); } catch(e){} }
                     Object.keys(activeNodes).forEach(f => { if(activeNodes[f].osc) try { activeNodes[f].osc.stop(); } catch(e){} });
@@ -729,64 +771,87 @@
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
                     disengageBackgroundPlay();
-                    stopLFO();
                     if (animationId) cancelAnimationFrame(animationId);
                     if (sweepAnimationId) cancelAnimationFrame(sweepAnimationId);
                     if (sleepTimerId) { clearTimeout(sleepTimerId); sleepTimerId = null; sleepTimerSelect.value = "0"; }
                 }
             }
 
-            // ----- NATIVE LFO (Hardware Accelerated) -----
+            // ----- NATIVE LFO — ALL WAVEFORMS USE OSCILLATORNODE -----
+            // No setInterval. Hardware-scheduled. Survives background tabs.
             function startLFO() {
                 if (!audioCtx || lfoOsc) return;
                 
                 const masterVal = parseFloat(gainSlider.value);
                 
-                if (lfoWaveform === 'square') {
-                    // Use precise interval for perfect 0% to 100% square gating
-                    if (lfoSquareIntervalId) clearInterval(lfoSquareIntervalId);
-                    gainNode.gain.setTargetAtTime(0.001, audioCtx.currentTime, 0.001); // Start at 0
-                    lfoSquareIntervalId = setInterval(() => {
-                        const currentVal = gainNode.gain.value;
-                        const targetVal = currentVal > 0.5 ? 0.001 : 1.0;
-                        gainNode.gain.setTargetAtTime(masterVal * targetVal, audioCtx.currentTime, 0.001);
-                    }, lfoPeriod * 1000 / 2); // Toggle twice per period
-                } else {
-                    // Standard native oscillator for Sine, Triangle, Sawtooth
-                    lfoOsc = audioCtx.createOscillator();
-                    lfoGain = audioCtx.createGain();
-                    lfoOsc.type = lfoWaveform;
-                    lfoOsc.frequency.value = 1 / lfoPeriod;
-                    gainNode.gain.value = masterVal / 2;
-                    lfoGain.gain.value = masterVal / 2;
-                    lfoOsc.connect(lfoGain);
-                    lfoGain.connect(gainNode.gain);
-                    lfoOsc.start();
-                }
+                // All waveforms: native oscillator output is -1 to +1.
+                // We want gain to swing from 0 to masterVal.
+                // Formula: gain = (offset) + (osc * depth)
+                //   where offset = masterVal/2, depth = masterVal/2
+                //   min: masterVal/2 + (-1 * masterVal/2) = 0
+                //   max: masterVal/2 + (+1 * masterVal/2) = masterVal
+                
+                lfoOsc = audioCtx.createOscillator();
+                lfoOsc.type = lfoWaveform;
+                lfoOsc.frequency.value = 1 / lfoPeriod;
+                
+                lfoGain = audioCtx.createGain();
+                lfoGain.gain.value = masterVal / 2; // Amplitude of modulation
+                
+                // DC offset so the waveform sits at masterVal/2 center
+                lfoOffsetNode = audioCtx.createConstantSource();
+                lfoOffsetNode.offset.value = masterVal / 2;
+                
+                // Set base gain to 0 — LFO takes full control
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                
+                // Connect: offset + osc*depth → gainNode.gain
+                lfoOffsetNode.connect(gainNode.gain);
+                lfoOsc.connect(lfoGain);
+                lfoGain.connect(gainNode.gain);
+                
+                lfoOffsetNode.start();
+                lfoOsc.start();
             }
 
             function stopLFO() {
-                if (lfoSquareIntervalId) {
-                    clearInterval(lfoSquareIntervalId);
-                    lfoSquareIntervalId = null;
-                }
+                // Stop and disconnect oscillator
                 if (lfoOsc) {
                     try { lfoOsc.stop(); } catch(e){}
-                    lfoOsc.disconnect(); 
-                    lfoGain.disconnect();
-                    lfoOsc = null; 
+                    try { lfoOsc.disconnect(); } catch(e){}
+                    lfoOsc = null;
+                }
+                if (lfoGain) {
+                    try { lfoGain.disconnect(); } catch(e){}
                     lfoGain = null;
                 }
-                if (gainNode) {
+                if (lfoOffsetNode) {
+                    try { lfoOffsetNode.stop(); } catch(e){}
+                    try { lfoOffsetNode.disconnect(); } catch(e){}
+                    lfoOffsetNode = null;
+                }
+                // Restore gain to slider value
+                if (gainNode && audioCtx) {
                     gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-                    gainNode.gain.setTargetAtTime(parseFloat(gainSlider.value), audioCtx.currentTime, 0.01);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, audioCtx.currentTime);
+                    gainNode.gain.setTargetAtTime(parseFloat(gainSlider.value), audioCtx.currentTime, 0.02);
                 }
             }
 
+            // Update LFO depth when gain slider moves — no restart needed
+            function updateLFOGain() {
+                if (!audioCtx || !isPlaying || !lfoEnabled || !lfoGain || !lfoOffsetNode) return;
+                const masterVal = parseFloat(gainSlider.value);
+                const t = audioCtx.currentTime;
+                lfoGain.gain.cancelScheduledValues(t);
+                lfoGain.gain.setTargetAtTime(masterVal / 2, t, 0.02);
+                lfoOffsetNode.offset.cancelScheduledValues(t);
+                lfoOffsetNode.offset.setTargetAtTime(masterVal / 2, t, 0.02);
+            }
+
+            // Restart LFO when waveform or period changes
             function updateLFOParams() {
                 if (!audioCtx || !isPlaying) return;
-                
-                // Restart LFO with new params
                 stopLFO();
                 if (lfoEnabled) startLFO();
             }
@@ -812,7 +877,8 @@
 
             function drawVisualizer() {
                 if (!isPlaying || !audioCtx || !analyser) return;
-                const WIDTH = visualizer.width; const HEIGHT = visualizer.height;
+                const WIDTH = visualizer.width;
+                const HEIGHT = visualizer.height;
                 try { analyser.getByteFrequencyData(dataArray); } catch (e) { stop(); return; }
                 canvasCtx.fillStyle = 'rgba(17, 17, 17, 0.2)';
                 canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -875,7 +941,7 @@
                 if (this.classList.contains('active')) selectedFreqs = selectedFreqs.filter(v => v !== f);
                 else selectedFreqs.push(f);
                 syncUI();
-                if (isPlaying && currentMode !== 'sweep') syncActiveNodes(); 
+                if (isPlaying && currentMode !== 'sweep') syncActiveNodes();
             }));
 
             addFreqBtn.addEventListener('click', () => {
@@ -897,7 +963,10 @@
             lfoToggle.addEventListener('change', function() {
                 lfoEnabled = this.checked;
                 syncUI();
-                if (isPlaying) { if (lfoEnabled) startLFO(); else stopLFO(); }
+                if (isPlaying) {
+                    if (lfoEnabled) startLFO();
+                    else stopLFO();
+                }
             });
 
             lfoBtns.forEach(btn => btn.addEventListener('click', function() {
@@ -913,93 +982,93 @@
                 if (lfoEnabled && isPlaying) updateLFOParams();
             });
 
+            // Gain slider — update LFO depth in real-time if LFO is running
             gainSlider.addEventListener('input', function() {
-                if (gainNode && lfoEnabled && lfoWaveform === 'square' && lfoSquareIntervalId) {
-                    // For square wave, the interval handles the toggling, but we need to update the base target.
-                    // We do nothing here because the interval reads masterVal dynamically on the next tick.
-                } else if (gainNode) {
-                    if (lfoEnabled && lfoGain) {
-                        const val = parseFloat(this.value);
-                        gainNode.gain.setTargetAtTime(val / 2, audioCtx.currentTime, 0.01);
-                        lfoGain.gain.setTargetAtTime(val / 2, audioCtx.currentTime, 0.01);
-                    } else {
-                        gainNode.gain.setTargetAtTime(parseFloat(this.value), audioCtx.currentTime, 0.01);
-                    }
+                gainValueEl.textContent = this.value;
+                if (isPlaying && lfoEnabled && lfoOsc) {
+                    // LFO is controlling gain — update its depth
+                    updateLFOGain();
+                } else if (gainNode && isPlaying) {
+                    // No LFO — set gain directly
+                    gainNode.gain.setTargetAtTime(parseFloat(this.value), audioCtx.currentTime, 0.02);
                 }
-                gainValue.textContent = this.value;
             });
 
             feedbackSlider.addEventListener('input', function() {
-                if (feedbackGain) feedbackGain.gain.setTargetAtTime(parseFloat(this.value), audioCtx.currentTime, 0.01);
-                feedbackValue.textContent = this.value;
+                feedbackValueEl.textContent = this.value;
+                if (feedbackGain && isPlaying) {
+                    feedbackGain.gain.setTargetAtTime(parseFloat(this.value), audioCtx.currentTime, 0.02);
+                }
             });
 
             saturationSlider.addEventListener('input', function() {
-                saturationAmount = parseInt(this.value);
-                if (shaper) shaper.curve = makeDistortionCurve(saturationAmount);
-                saturationValue.textContent = this.value;
+                saturationValueEl.textContent = this.value;
+                saturationAmount = parseFloat(this.value);
+                if (shaper && isPlaying) {
+                    shaper.curve = makeDistortionCurve(saturationAmount);
+                }
             });
 
             qSlider.addEventListener('input', function() {
                 qValue = parseFloat(this.value);
                 qValueDisplay.textContent = qValue.toFixed(1);
-                if (Object.keys(activeNodes).length > 0) {
-                    Object.values(activeNodes).forEach(node => {
-                        if(node.filter) node.filter.Q.setTargetAtTime(qValue, audioCtx.currentTime, 0.01);
-                    });
-                }
+                // Update Q on all active filters in real-time
+                Object.values(activeNodes).forEach(node => {
+                    if (node.filter) node.filter.Q.setTargetAtTime(qValue, audioCtx.currentTime, 0.02);
+                });
                 updateRangeDisplay();
             });
 
+            // Sleep Timer
             sleepTimerSelect.addEventListener('change', function() {
-                if (sleepTimerId) clearTimeout(sleepTimerId);
                 const mins = parseInt(this.value);
-                if (mins > 0) {
-                    statusDisplay.textContent = `Sleep timer set for ${mins} minutes.`;
+                if (sleepTimerId) { clearTimeout(sleepTimerId); sleepTimerId = null; }
+                if (mins > 0 && isPlaying) {
                     sleepTimerId = setTimeout(() => {
                         stop();
-                        statusDisplay.textContent = 'Sleep timer ended. Audio stopped.';
-                        sleepTimerSelect.value = "0";
+                        statusDisplay.textContent = 'Sleep timer ended.';
+                        setTimeout(() => statusDisplay.textContent='', 5000);
                     }, mins * 60 * 1000);
-                } else {
-                    statusDisplay.textContent = '';
                 }
             });
 
+            // Recording
             recordBtn.addEventListener('click', () => {
-                if (!isPlaying) return alert("Please start the audio engine before recording.");
                 if (!recording) {
+                    if (!audioCtx) { statusDisplay.textContent = 'Start audio first to record.'; return; }
                     try {
                         const dest = audioCtx.createMediaStreamDestination();
                         masterCompressor.connect(dest);
-                        mediaRecorder = new MediaRecorder(dest.stream);
+                        mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
                         recordedChunks = [];
                         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-                        mediaRecorder.onstop = e => {
+                        mediaRecorder.onstop = () => {
                             const blob = new Blob(recordedChunks, { type: 'audio/webm' });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = 'acoustic-sanctuary-recording.webm';
-                            document.body.appendChild(a);
-                            a.click();
-                            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+                            a.href = url; a.download = 'acoustic-sanctuary-' + Date.now() + '.webm';
+                            a.click(); URL.revokeObjectURL(url);
+                            masterCompressor.disconnect(dest);
                         };
                         mediaRecorder.start();
                         recording = true;
                         recordBtn.textContent = 'Stop Recording';
                         recordBtn.classList.add('recording');
-                    } catch (e) { alert("Recording not supported on this browser."); }
+                        statusDisplay.textContent = 'Recording...';
+                    } catch(e) {
+                        statusDisplay.textContent = 'Recording not supported: ' + e.message;
+                    }
                 } else {
-                    mediaRecorder.stop();
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
                     recording = false;
                     recordBtn.textContent = 'Start Recording';
                     recordBtn.classList.remove('recording');
+                    statusDisplay.textContent = 'Recording saved.';
+                    setTimeout(() => statusDisplay.textContent='', 3000);
                 }
             });
 
-            // Initial Boot
+            // ----- INIT -----
             loadPresetsFromStorage();
             syncUI();
         });
