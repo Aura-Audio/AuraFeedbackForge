@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FeedbackForge Pro</title>
+    <title>Acoustic Sanctuary (FeedbackForge Pro)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,7 +14,7 @@
             background-color: #f5f5f5;
         }
         h1 { color: #333; margin-bottom: 5px; }
-        .controls, .presets-container {
+        .controls, .presets-container, .timer-container {
             background: white;
             padding: 20px;
             border-radius: 10px;
@@ -22,6 +22,7 @@
             margin: 20px 0;
         }
         .presets-container { background: #e9ecef; padding: 15px; }
+        .timer-container { background: #f0f4f8; }
         button {
             padding: 10px 20px; font-size: 16px; color: white; border: none;
             border-radius: 5px; cursor: pointer; margin: 5px; transition: background 0.3s;
@@ -30,12 +31,16 @@
         #startBtn { background: #4CAF50; }
         #stopBtn { background: #f44336; }
         #resetBtn { background: #FF9800; }
+        #recordBtn { background: #d32f2f; }
+        #recordBtn.recording { background: #000; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
         
-        .preset-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; }
-        select, input[type="text"] { padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        .preset-controls, .manual-freq-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        select, input[type="text"], input[type="number"] { padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
         #loadPresetBtn { background: #2196F3; padding: 8px 16px; }
         #savePresetBtn { background: #9C27B0; padding: 8px 16px; }
         #deletePresetBtn { background: #607D8B; padding: 8px 16px; }
+        #addFreqBtn { background: #555; padding: 8px 16px; }
 
         .slider-container, .toggle-container { margin: 15px 0; }
         .slider-container label, .toggle-container label { display: block; margin-bottom: 5px; font-weight: bold; }
@@ -74,7 +79,7 @@
             font-size: 11px; min-width: 60px;
         }
         .freq-btn.active { background: #0b7dda; font-weight: bold; box-shadow: 0 0 5px rgba(11, 125, 218, 0.8); }
-        .range-display { margin-top: 10px; font-size: 14px; color: #333; text-align: left; max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border-radius: 5px; }
+        .range-display { margin-top: 10px; font-size: 14px; color: #333; text-align: left; max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
         .freq-group { display: flex; flex-direction: column; margin: 10px 0; }
         .freq-group-title { font-weight: bold; margin-bottom: 5px; color: #555; font-size: 13px; }
         
@@ -97,16 +102,17 @@
     </style>
 </head>
 <body>
-    <h1>FeedbackForge Pro</h1>
-    <p>Generate feedback using <strong>Sine Waves</strong>, <strong>Noise</strong>, or dynamic <strong>Frequency Sweeps</strong>. Now with Zero-Dropout Dynamic Routing, Native LFO, and Saturation.</p>
+    <!-- Hidden Silent Audio for Mobile Background Play -->
+    <audio id="silentAudio" loop hidden src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
+
+    <h1>Acoustic Sanctuary</h1>
+    <p>Targeted acoustic defense, tinnitus masking, and deep focus. Powered by real-time resonant feedback.</p>
     
-    <!-- Presets Section -->
+    <!-- Presets -->
     <div class="presets-container">
         <div style="font-weight: bold; margin-bottom: 10px; color: #333;">Saved Configurations</div>
         <div class="preset-controls">
-            <select id="presetSelect">
-                <option value="">-- Factory & Saved Presets --</option>
-            </select>
+            <select id="presetSelect"><option value="">-- Factory & Saved Presets --</option></select>
             <button id="loadPresetBtn">Load</button>
             <input type="text" id="presetNameInput" placeholder="New preset name...">
             <button id="savePresetBtn">Save</button>
@@ -114,50 +120,62 @@
         </div>
     </div>
 
+    <!-- Timer & Export -->
+    <div class="timer-container">
+        <div class="preset-controls">
+            <label for="sleepTimerSelect"><strong>Sleep Timer:</strong></label>
+            <select id="sleepTimerSelect">
+                <option value="0">Off</option>
+                <option value="15">15 mins</option>
+                <option value="30">30 mins</option>
+                <option value="60">1 hour</option>
+                <option value="120">2 hours</option>
+            </select>
+            <button id="recordBtn">Start Recording</button>
+        </div>
+    </div>
+
     <div class="controls">
         <div>
             <button id="startBtn">Start Audio</button>
-            <button id="stopBtn" class="stop" disabled>Stop Audio</button>
+            <button id="stopBtn" disabled>Stop Audio</button>
             <button id="resetBtn">Reset System</button>
         </div>
         <div class="status" id="status"></div>
         
         <div class="mode-selector">
             <div style="margin-bottom: 10px; font-weight: bold; width: 100%;"><strong>Signal Source:</strong></div>
-            <button class="mode-btn active" id="sineModeBtn" data-mode="sine">Sine Waves</button>
-            <button class="mode-btn" id="noiseModeBtn" data-mode="noise">Noise Filters</button>
-            <button class="mode-btn" id="sweepModeBtn" data-mode="sweep">Frequency Sweep</button>
+            <button class="mode-btn active" data-mode="sine">Sine Waves</button>
+            <button class="mode-btn" data-mode="noise">Acoustic Camouflage</button>
+            <button class="mode-btn" data-mode="sweep">Room Sonar / Sweep</button>
         </div>
         
         <div class="noise-type-selector" id="noiseTypeSelector" style="display: none;">
-            <button class="noise-type-btn active" id="whiteNoiseBtn" data-noise="white">White Noise</button>
-            <button class="noise-type-btn" id="pinkNoiseBtn" data-noise="pink">Pink Noise</button>
-            <button class="noise-type-btn" id="brownNoiseBtn" data-noise="brown">Brown Noise</button>
+            <button class="noise-type-btn active" data-noise="white">White Noise</button>
+            <button class="noise-type-btn" data-noise="pink">Pink Noise</button>
+            <button class="noise-type-btn" data-noise="brown">Brown Noise</button>
         </div>
 
         <div class="sweep-settings" id="sweepSettings" style="display: none;">
             <div class="slider-container">
                 <label for="sweepTimeInput">Sweep Duration (Seconds): <span id="sweepTimeValue">5.0</span></label>
                 <input type="range" id="sweepTimeInput" min="0.5" max="20" value="5.0" step="0.5">
-                <p style="font-size: 12px; color: #666; margin-top: 5px;">Sweeps back and forth continuously between your <strong>lowest</strong> and <strong>highest</strong> selected active bands.</p>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">Sweeps back and forth continuously between your lowest and highest selected active bands.</p>
             </div>
         </div>
         
         <div class="lfo-controls" id="lfoControls">
             <div class="toggle-container">
-                <label>LFO (Master Volume Modulation - Native Web Audio):</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="lfoToggle">
-                    <span class="toggle-slider"></span>
-                </label>
+                <label>LFO (Native Hardware-Accelerated Volume Modulation):</label>
+                <label class="toggle-switch"><input type="checkbox" id="lfoToggle"><span class="toggle-slider"></span></label>
                 <span class="toggle-label" id="lfoLabel">Disabled</span>
             </div>
             <div id="lfoSettings" style="display: none;">
                 <div class="lfo-waveform-selector">
-                    <button class="lfo-waveform-btn active" id="sineWaveformBtn" data-waveform="sine">Sine</button>
-                    <button class="lfo-waveform-btn" id="squareWaveformBtn" data-waveform="square">Square</button>
-                    <button class="lfo-waveform-btn" id="triangleWaveformBtn" data-waveform="triangle">Triangle</button>
-                    <button class="lfo-waveform-btn" id="sawWaveformBtn" data-waveform="sawtooth">Sawtooth</button>
+                    <button class="lfo-waveform-btn active" data-waveform="sine">Sine</button>
+                    <button class="lfo-waveform-btn" data-waveform="square">Square</button>
+                    <button class="lfo-waveform-btn" data-waveform="triangle">Triangle</button>
+                    <button class="lfo-waveform-btn" data-waveform="sawtooth">Sawtooth</button>
                 </div>
                 <div class="slider-container">
                     <label for="lfoPeriodInput">LFO Cycle Length (seconds): <span id="lfoPeriodValue">2.0</span></label>
@@ -166,8 +184,8 @@
             </div>
         </div>
         
-        <div style="margin-top: 20px; font-weight: bold; color: #444;">Active Frequency Bands (Zero-Dropout Dynamic Routing):</div>
-        <div class="frequency-selector">
+        <div style="margin-top: 20px; font-weight: bold; color: #444;">Active Frequency Bands (Zero-Dropout Routing):</div>
+        <div class="frequency-selector" id="freqSelectorContainer">
             <div class="freq-group">
                 <div class="freq-group-title">Sub-Bass (20-60Hz)</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
@@ -220,6 +238,12 @@
                 </div>
             </div>
         </div>
+
+        <!-- Manual Frequency Input -->
+        <div class="manual-freq-controls">
+            <input type="number" id="manualFreqInput" placeholder="Add custom Hz (e.g. 62)" min="20" max="20000">
+            <button id="addFreqBtn">Add Frequency</button>
+        </div>
         
         <div class="range-display" id="rangeDisplay">Selected frequency ranges will appear here.</div>
         
@@ -228,22 +252,18 @@
             <input type="range" id="gainSlider" min="0.1" max="0.9" value="0.5" step="0.05">
         </div>
         
-        <div class="toggle-container">
-            <label>Filter Q (Resonance Width):</label>
-            <label class="toggle-switch">
-                <input type="checkbox" id="qToggle" checked>
-                <span class="toggle-slider"></span>
-            </label>
-            <span class="toggle-label" id="qLabel">Narrow (High Q)</span>
+        <div class="slider-container">
+            <label for="qSlider">Resonance (Filter Q): <span id="qValueDisplay" class="value-display">1.0</span></label>
+            <input type="range" id="qSlider" min="0.5" max="25" value="1.0" step="0.5">
         </div>
         
         <div class="slider-container">
-            <label for="feedbackSlider">Feedback Amount: <span id="feedbackValue" class="value-display">0.3</span></label>
+            <label for="feedbackSlider">Feedback Amount (Sustain & Depth): <span id="feedbackValue" class="value-display">0.3</span></label>
             <input type="range" id="feedbackSlider" min="0.0" max="0.8" value="0.3" step="0.05">
         </div>
 
         <div class="slider-container">
-            <label for="saturationSlider">Feedback Saturation (Distortion): <span id="saturationValue" class="value-display">10</span></label>
+            <label for="saturationSlider">Harmonic Saturation (Warmth): <span id="saturationValue" class="value-display">10</span></label>
             <input type="range" id="saturationSlider" min="0" max="100" value="10" step="1">
         </div>
     </div>
@@ -263,6 +283,7 @@
             <li><strong>Saturation:</strong> Adds analog-style harmonic distortion to the feedback path.</li>
             <li><strong>Stereo Spatialization:</strong> Frequencies are automatically panned across the stereo field based on pitch.</li>
             <li><strong>Native LFO:</strong> Volume modulation is now hardware-accelerated via Web Audio for zero-latency drift.</li>
+            <li><strong>Background Play:</strong> Audio continues when switching tabs or locking your screen.</li>
         </ul>
         <p><em>Note: Audio feedback is actively restricted by built-in limiters and a delay node to protect your hearing and prevent context crashes.</em></p>
     </div>
@@ -288,6 +309,10 @@
             let canvasCtx;
             let animationId;
             let sweepAnimationId = null;
+            let recording = false;
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let sleepTimerId = null;
             
             // Native LFO Nodes
             let lfoOsc = null;
@@ -297,7 +322,7 @@
             let currentMode = 'sine';
             let noiseType = 'white';
             let selectedFreqs = [20, 80, 100, 125, 150, 200, 250, 500, 1000];
-            let isNarrowQ = true;
+            let qValue = 1.0; // Dynamic Q Value
             let saturationAmount = 10;
             
             // Sweep State
@@ -308,11 +333,25 @@
             let lfoEnabled = false;
             let lfoWaveform = 'sine';
             let lfoPeriod = 2.0; 
-            
+
+            // Expanded Factory Presets
             const factoryPresets = {
-                "Factory: Classic Sine": { mode: "sine", noiseType: "white", freqs: [20, 100, 500, 1000], qNarrow: true, gain: 0.5, feedback: 0.3, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 10 },
-                "Factory: Rumble Noise": { mode: "noise", noiseType: "brown", freqs: [20, 30, 40, 50, 60, 80], qNarrow: false, gain: 0.7, feedback: 0.5, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 3.0, sweepTime: 5.0, sat: 40 },
-                "Factory: Full Range Sweep": { mode: "sweep", noiseType: "white", freqs: [20, 20000], qNarrow: true, gain: 0.6, feedback: 0.4, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 10.0, sat: 20 }
+                // STANDARD / MASS APPEAL
+                "Standard: Pure White (Static Mask)": { mode: "noise", noiseType: "white", freqs: [20, 50, 100, 500, 1000, 4000, 8000], qValue: 1.0, gain: 0.4, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
+                "Standard: Pure Pink (Focus)": { mode: "noise", noiseType: "pink", freqs: [20, 80, 200, 500, 1000, 3000], qValue: 1.0, gain: 0.5, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
+                "Standard: Deep Brown (Sleep)": { mode: "noise", noiseType: "brown", freqs: [20, 40, 60, 80, 125], qValue: 1.0, gain: 0.6, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 0 },
+                
+                // UNIQUE WHITE
+                "White: Tinnitus Sanctuary": { mode: "noise", noiseType: "white", freqs: [6000, 8000], qValue: 20.0, gain: 0.3, feedback: 0.5, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 20 },
+                "White: Brainstorm Sizzle": { mode: "noise", noiseType: "white", freqs: [2000, 3000, 4000], qValue: 15.0, gain: 0.35, feedback: 0.3, lfoEnabled: true, lfoWaveform: "square", lfoPeriod: 0.2, sweepTime: 5.0, sat: 10 },
+
+                // UNIQUE PINK
+                "Pink: Oceanic Pulse": { mode: "noise", noiseType: "pink", freqs: [100, 200, 500], qValue: 10.0, gain: 0.5, feedback: 0.6, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 6.0, sweepTime: 5.0, sat: 30 },
+                "Pink: Rain on Tin Roof": { mode: "noise", noiseType: "pink", freqs: [1000, 2000, 4000], qValue: 12.0, gain: 0.4, feedback: 0.2, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 60 },
+
+                // UNIQUE BROWN
+                "Brown: Sub-Bass Assassin (Neighbor Defense)": { mode: "noise", noiseType: "brown", freqs: [40, 50, 60], qValue: 25.0, gain: 0.7, feedback: 0.7, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, sweepTime: 5.0, sat: 50 },
+                "Brown: Tibetan Singing Bowl": { mode: "noise", noiseType: "brown", freqs: [80, 120, 240], qValue: 18.0, gain: 0.5, feedback: 0.8, lfoEnabled: true, lfoWaveform: "triangle", lfoPeriod: 5.0, sweepTime: 5.0, sat: 40 }
             };
 
             // ----- DOM ELEMENTS -----
@@ -331,15 +370,17 @@
             const sweepTimeInput = document.getElementById('sweepTimeInput');
             const sweepTimeValue = document.getElementById('sweepTimeValue');
             const freqButtons = document.querySelectorAll('.freq-btn');
+            const manualFreqInput = document.getElementById('manualFreqInput');
+            const addFreqBtn = document.getElementById('addFreqBtn');
             const rangeDisplay = document.getElementById('rangeDisplay');
             const gainSlider = document.getElementById('gainSlider');
             const feedbackSlider = document.getElementById('feedbackSlider');
             const saturationSlider = document.getElementById('saturationSlider');
-            const qToggle = document.getElementById('qToggle');
+            const qSlider = document.getElementById('qSlider');
             const gainValue = document.getElementById('gainValue');
             const feedbackValue = document.getElementById('feedbackValue');
             const saturationValue = document.getElementById('saturationValue');
-            const qLabel = document.getElementById('qLabel');
+            const qValueDisplay = document.getElementById('qValueDisplay');
             const lfoToggle = document.getElementById('lfoToggle');
             const lfoLabel = document.getElementById('lfoLabel');
             const lfoSettingsDiv = document.getElementById('lfoSettings');
@@ -348,6 +389,9 @@
             const lfoPeriodValue = document.getElementById('lfoPeriodValue');
             const visualizer = document.getElementById('visualizer');
             const statusDisplay = document.getElementById('status');
+            const sleepTimerSelect = document.getElementById('sleepTimerSelect');
+            const recordBtn = document.getElementById('recordBtn');
+            const silentAudio = document.getElementById('silentAudio');
 
             // ----- HELPER FUNCTIONS -----
             function makeDistortionCurve(amount) {
@@ -366,17 +410,50 @@
             }
             window.addEventListener('resize', () => { if(canvasCtx) resizeCanvas(); });
 
+            // ----- BACKGROUND PLAY FIXES -----
+            function engageBackgroundPlay() {
+                silentAudio.play().catch(e => console.log("Silent audio blocked until user interacts."));
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: 'Acoustic Sanctuary',
+                        artist: 'FeedbackForge Pro',
+                        album: 'Ambient Masking',
+                        artwork: [{ src: 'https://via.placeholder.com/96/111/fff?text=AS', sizes: '96x96', type: 'image/png' }]
+                    });
+                    navigator.mediaSession.setActionHandler('play', () => {});
+                    navigator.mediaSession.setActionHandler('pause', () => {});
+                }
+            }
+
+            function disengageBackgroundPlay() {
+                silentAudio.pause();
+                silentAudio.currentTime = 0;
+            }
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended' && isPlaying) {
+                    audioCtx.resume();
+                }
+            });
+
             // ----- PRESET MANAGEMENT -----
             function loadPresetsFromStorage() {
                 let userPresets = JSON.parse(localStorage.getItem('fbForgePresets')) || {};
                 presetSelect.innerHTML = '<option value="">-- Select Preset --</option>';
-                Object.keys(factoryPresets).forEach(name => presetSelect.add(new Option(name, name)));
+                
+                // Group Factory Presets
+                const factoryGroup = document.createElement('optgroup');
+                factoryGroup.label = "Factory Presets";
+                Object.keys(factoryPresets).forEach(name => factoryGroup.appendChild(new Option(name, name)));
+                presetSelect.appendChild(factoryGroup);
+                
+                // Group User Presets
                 const userKeys = Object.keys(userPresets);
                 if (userKeys.length > 0) {
-                    const group = document.createElement('optgroup');
-                    group.label = "User Presets";
-                    userKeys.forEach(name => group.appendChild(new Option(name, name)));
-                    presetSelect.appendChild(group);
+                    const userGroup = document.createElement('optgroup');
+                    userGroup.label = "User Presets";
+                    userKeys.forEach(name => userGroup.appendChild(new Option(name, name)));
+                    presetSelect.appendChild(userGroup);
                 }
             }
             
@@ -385,15 +462,19 @@
                 noiseTypeSelector.style.display = currentMode === 'noise' ? 'flex' : 'none';
                 sweepSettings.style.display = currentMode === 'sweep' ? 'block' : 'none';
                 noiseBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-noise') === noiseType));
+                
+                // Sync Freq Buttons
                 freqButtons.forEach(btn => {
                     const f = parseInt(btn.getAttribute('data-freq'));
                     btn.classList.toggle('active', selectedFreqs.includes(f));
                 });
+                
                 gainValue.textContent = gainSlider.value;
                 feedbackValue.textContent = feedbackSlider.value;
                 saturationValue.textContent = saturationSlider.value;
-                qToggle.checked = isNarrowQ;
-                qLabel.textContent = isNarrowQ ? 'Narrow (High Q)' : 'Wide (Low Q)';
+                qValueDisplay.textContent = qValue.toFixed(1);
+                qSlider.value = qValue;
+                
                 lfoToggle.checked = lfoEnabled;
                 lfoLabel.textContent = lfoEnabled ? 'Enabled' : 'Disabled';
                 lfoSettingsDiv.style.display = lfoEnabled ? 'block' : 'none';
@@ -410,7 +491,7 @@
                 if(!name) return alert("Please enter a name for your preset.");
                 if(factoryPresets[name]) return alert("Cannot overwrite a factory preset.");
                 const presetObj = {
-                    mode: currentMode, noiseType, freqs: [...selectedFreqs], qNarrow: isNarrowQ,
+                    mode: currentMode, noiseType, freqs: [...selectedFreqs], qValue,
                     gain: parseFloat(gainSlider.value), feedback: parseFloat(feedbackSlider.value),
                     lfoEnabled, lfoWaveform, lfoPeriod, sweepTime, sat: parseFloat(saturationSlider.value)
                 };
@@ -432,7 +513,7 @@
                     currentMode = presetData.mode || 'sine';
                     noiseType = presetData.noiseType || 'white';
                     selectedFreqs = presetData.freqs || [];
-                    isNarrowQ = presetData.qNarrow !== undefined ? presetData.qNarrow : true;
+                    qValue = presetData.qValue !== undefined ? presetData.qValue : 1.0;
                     gainSlider.value = presetData.gain || 0.5;
                     feedbackSlider.value = presetData.feedback !== undefined ? presetData.feedback : 0.3;
                     saturationSlider.value = presetData.sat !== undefined ? presetData.sat : 10;
@@ -461,22 +542,20 @@
                 }
             });
 
-            // ----- DYNAMIC NODE MANAGEMENT (Zero-Dropout) -----
+            // ----- DYNAMIC NODE MANAGEMENT -----
             function addFrequencyNode(freq) {
                 if (!audioCtx || activeNodes[freq]) return;
-                
                 const filter = audioCtx.createBiquadFilter();
                 filter.type = 'bandpass';
                 filter.frequency.value = freq;
-                filter.Q.value = isNarrowQ ? 20 : 1;
+                filter.Q.value = qValue; // Use dynamic Q
                 
                 const panner = audioCtx.createStereoPanner();
-                // Spatialize: 20Hz = -0.8 (Left), 24000Hz = 0.8 (Right)
                 panner.pan.value = Math.max(-0.8, Math.min(0.8, (Math.log(freq) - Math.log(1000)) / 4));
                 
                 filter.connect(panner);
                 panner.connect(gainNode);
-                feedbackGain.connect(filter); // Feedback route
+                feedbackGain.connect(filter);
                 
                 let osc = null;
                 if (currentMode === 'sine') {
@@ -488,7 +567,6 @@
                 } else if (currentMode === 'noise' && noiseSource) {
                     noiseSource.connect(filter);
                 }
-                
                 activeNodes[freq] = { osc, filter, panner };
             }
 
@@ -506,13 +584,9 @@
 
             function syncActiveNodes() {
                 if (!isPlaying) return;
-                
-                // Remove unselected
                 Object.keys(activeNodes).forEach(f => {
                     if (!selectedFreqs.includes(parseInt(f))) removeFrequencyNode(parseInt(f));
                 });
-                
-                // Add selected
                 selectedFreqs.forEach(f => {
                     if (!activeNodes[f] && f <= audioCtx.sampleRate / 2) addFrequencyNode(f);
                 });
@@ -523,7 +597,6 @@
                 if (!audioCtx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     audioCtx = new AudioContext();
-                    
                     masterCompressor = audioCtx.createDynamicsCompressor();
                     masterCompressor.threshold.value = -3;
                     masterCompressor.knee.value = 10;
@@ -546,13 +619,8 @@
                 if (shaper) { try { shaper.disconnect(); } catch(e) {} }
                 if (analyser) { try { analyser.disconnect(); } catch(e) {} }
 
-                noiseSource = null;
-                sweepOsc = null;
-                gainNode = null;
-                feedbackGain = null;
-                feedbackDelay = null;
-                shaper = null;
-                analyser = null;
+                noiseSource = null; sweepOsc = null; gainNode = null; 
+                feedbackGain = null; feedbackDelay = null; shaper = null; analyser = null;
 
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
@@ -567,52 +635,39 @@
                 try {
                     initAudioContext();
                     if (audioCtx.state === 'suspended') await audioCtx.resume();
-                } catch (e) {
-                    return statusDisplay.textContent = 'Error: Could not resume audio. ' + e.message;
-                }
+                } catch (e) { return statusDisplay.textContent = 'Error: Could not resume audio. ' + e.message; }
 
                 gainNode = audioCtx.createGain();
                 gainNode.gain.value = parseFloat(gainSlider.value);
-                
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 2048;
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
                 
-                // Feedback Path with Delay and Saturation
                 feedbackGain = audioCtx.createGain();
                 feedbackGain.gain.value = parseFloat(feedbackSlider.value);
-                
                 feedbackDelay = audioCtx.createDelay(1.0);
-                feedbackDelay.delayTime.value = 0.05; // 50ms delay to prevent math loop crashes
-                
+                feedbackDelay.delayTime.value = 0.05; 
                 shaper = audioCtx.createWaveShaper();
                 shaper.curve = makeDistortionCurve(saturationAmount);
                 
-                // Global Routing
                 gainNode.connect(analyser);
                 analyser.connect(masterCompressor);
-                
-                // Feedback Loop Routing: analyser -> shaper -> delay -> gain -> (back to filters)
                 analyser.connect(shaper);
                 shaper.connect(feedbackDelay);
                 feedbackDelay.connect(feedbackGain);
 
-                // Setup Source-Specific Graph
                 if (currentMode === 'sweep') {
                     sweepOsc = audioCtx.createOscillator();
                     let sweepFilter = audioCtx.createBiquadFilter();
                     let sweepPanner = audioCtx.createStereoPanner();
-                    
                     sweepOsc.type = 'sine';
                     sweepFilter.type = 'bandpass';
-                    sweepFilter.Q.value = isNarrowQ ? 20 : 1;
-                    sweepPanner.pan.value = 0; // Center sweep
-                    
+                    sweepFilter.Q.value = qValue; // Use dynamic Q
+                    sweepPanner.pan.value = 0;
                     sweepOsc.connect(sweepFilter);
                     sweepFilter.connect(sweepPanner);
                     sweepPanner.connect(gainNode);
-                    feedbackGain.connect(sweepFilter); // Feedback into sweep filter
-                    
+                    feedbackGain.connect(sweepFilter);
                     activeNodes['sweep'] = { osc: sweepOsc, filter: sweepFilter, panner: sweepPanner };
                 } 
                 else if (currentMode === 'noise') {
@@ -620,11 +675,9 @@
                     let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
                     const noiseData = noiseBuffer.getChannelData(0);
                     for (let i = 0; i < bufferSize; i++) noiseData[i] = Math.random() * 2 - 1;
-                    
                     noiseSource = audioCtx.createBufferSource();
                     noiseSource.buffer = noiseBuffer;
                     noiseSource.loop = true;
-                    
                     let targetSource = noiseSource;
                     if (noiseType !== 'white') {
                         const colorFilter = audioCtx.createBiquadFilter();
@@ -634,18 +687,14 @@
                         noiseSource.connect(colorFilter);
                         targetSource = colorFilter;
                     }
-                    
-                    // Initialize frequency nodes dynamically
                     selectedFreqs.forEach(freq => {
                         if (freq <= audioCtx.sampleRate / 2) {
                             addFrequencyNode(freq);
-                            // addFrequencyNode handles connecting targetSource to filter internally
-                            // but since noise is shared, we do it here:
                             targetSource.connect(activeNodes[freq].filter);
                         }
                     });
                 } 
-                else { // Sine Waves
+                else { // Sine
                     selectedFreqs.forEach(freq => {
                         if (freq <= audioCtx.sampleRate / 2) addFrequencyNode(freq);
                     });
@@ -656,11 +705,13 @@
                 try {
                     if (currentMode === 'sweep') sweepOsc.start();
                     else if (currentMode === 'noise') noiseSource.start();
-                    
                     isPlaying = true;
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
                     
+                    engageBackgroundPlay(); // Engage mobile background play
+                    audioCtx.resume();
+
                     sweepStartTime = performance.now();
                     drawVisualizer();
                     if (lfoEnabled) startLFO();
@@ -676,46 +727,39 @@
                     if (noiseSource) { try { noiseSource.stop(); } catch(e){} }
                     if (sweepOsc) { try { sweepOsc.stop(); } catch(e){} }
                     Object.keys(activeNodes).forEach(f => { if(activeNodes[f].osc) try { activeNodes[f].osc.stop(); } catch(e){} });
-                    
                     isPlaying = false;
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
+                    disengageBackgroundPlay(); // Stop background play
                     stopLFO();
                     if (animationId) cancelAnimationFrame(animationId);
                     if (sweepAnimationId) cancelAnimationFrame(sweepAnimationId);
+                    if (sleepTimerId) { clearTimeout(sleepTimerId); sleepTimerId = null; sleepTimerSelect.value = "0"; }
                 }
             }
 
-            // ----- NATIVE LFO (Hardware Accelerated) -----
+            // ----- NATIVE LFO -----
             function startLFO() {
                 if (!audioCtx || lfoOsc) return;
                 lfoOsc = audioCtx.createOscillator();
                 lfoGain = audioCtx.createGain();
                 lfoOsc.type = lfoWaveform;
                 lfoOsc.frequency.value = 1 / lfoPeriod;
-                
-                // Setup depth: base gain is half, depth is half
                 const masterVal = parseFloat(gainSlider.value);
                 gainNode.gain.value = masterVal / 2;
                 lfoGain.gain.value = masterVal / 2;
-                
                 lfoOsc.connect(lfoGain);
                 lfoGain.connect(gainNode.gain);
                 lfoOsc.start();
             }
-
             function stopLFO() {
                 if (lfoOsc) {
                     try { lfoOsc.stop(); } catch(e){}
-                    lfoOsc.disconnect();
-                    lfoGain.disconnect();
-                    lfoOsc = null;
-                    lfoGain = null;
-                    // Restore full gain
+                    lfoOsc.disconnect(); lfoGain.disconnect();
+                    lfoOsc = null; lfoGain = null;
                     if (gainNode) gainNode.gain.value = parseFloat(gainSlider.value);
                 }
             }
-
             function updateLFOParams() {
                 if (lfoOsc && lfoGain) {
                     lfoOsc.type = lfoWaveform;
@@ -733,16 +777,11 @@
                 const elapsedSeconds = (now - sweepStartTime) / 1000;
                 const phase = (elapsedSeconds % (sweepTime * 2)) / (sweepTime * 2);
                 const progress = phase < 0.5 ? phase * 2 : 2 - (phase * 2);
-                
                 let minFreq = selectedFreqs.length > 0 ? Math.min(...selectedFreqs) : 20;
                 let maxFreq = selectedFreqs.length > 0 ? Math.max(...selectedFreqs) : 20000;
                 if (minFreq === maxFreq) { minFreq = 20; maxFreq = 20000; }
                 if (maxFreq > audioCtx.sampleRate / 2) maxFreq = audioCtx.sampleRate / 2 - 100;
-                
-                const minLog = Math.log(minFreq);
-                const maxLog = Math.log(maxFreq);
-                const currentFreq = Math.exp(minLog + progress * (maxLog - minLog));
-                
+                const currentFreq = Math.exp(Math.log(minFreq) + progress * (Math.log(maxFreq) - Math.log(minFreq)));
                 try {
                     sweepOsc.frequency.setTargetAtTime(currentFreq, audioCtx.currentTime, 0.01);
                     if (activeNodes['sweep']) activeNodes['sweep'].filter.frequency.setTargetAtTime(currentFreq, audioCtx.currentTime, 0.01);
@@ -754,32 +793,25 @@
                 if (!isPlaying || !audioCtx || !analyser) return;
                 const WIDTH = visualizer.width; const HEIGHT = visualizer.height;
                 try { analyser.getByteFrequencyData(dataArray); } catch (e) { stop(); return; }
-                
-                // Fade background for smooth trailing effect
                 canvasCtx.fillStyle = 'rgba(17, 17, 17, 0.2)';
                 canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-                
                 const barWidth = WIDTH / analyser.frequencyBinCount;
                 const freqPerBin = audioCtx.sampleRate / analyser.frequencyBinCount;
-                
                 for (let i = 0; i < analyser.frequencyBinCount; i++) {
                     const barHeight = (dataArray[i] / 255) * HEIGHT;
                     const freq = i * freqPerBin;
                     let highlight = false;
                     if (currentMode !== 'sweep') {
                         selectedFreqs.forEach(f => {
-                            const bw = f / (isNarrowQ ? 20 : 1);
+                            const bw = f / qValue; // Use dynamic Q
                             if (freq >= f - bw/2 && freq <= f + bw/2) highlight = true;
                         });
                     }
                     canvasCtx.fillStyle = highlight ? `rgba(255, 255, 0, 0.8)` : `rgba(${barHeight + 50}, 50, 80, 0.6)`;
                     canvasCtx.fillRect(i * barWidth, HEIGHT - barHeight, barWidth, barHeight);
                 }
-                
                 if (currentMode === 'sweep' && sweepOsc) {
-                    const currentSweepFreq = sweepOsc.frequency.value;
-                    const bin = Math.round(currentSweepFreq / freqPerBin);
-                    const xPos = bin * barWidth;
+                    const xPos = Math.round(sweepOsc.frequency.value / freqPerBin) * barWidth;
                     canvasCtx.fillStyle = 'rgba(0, 255, 255, 0.7)';
                     canvasCtx.fillRect(xPos - 4, 0, 4, HEIGHT);
                 }
@@ -793,9 +825,8 @@
                     let max = selectedFreqs.length > 0 ? Math.max(...selectedFreqs) : 20000;
                     txt = `<strong>Mode:</strong> Frequency Sweep <br><strong>Range:</strong> ${min}Hz to ${max}Hz | <strong>Duration:</strong> ${sweepTime}s`;
                 } else {
-                    const q = isNarrowQ ? 20 : 1;
                     txt = `<strong>Mode:</strong> ${currentMode === 'sine' ? 'Sine Waves' : 'Noise ('+noiseType+')'}<br><strong>Active Bands:</strong><br>`;
-                    txt += selectedFreqs.length === 0 ? 'None' : selectedFreqs.map(f => `${f}Hz (Width: ${(f/q).toFixed(1)}Hz)`).join('<br>');
+                    txt += selectedFreqs.length === 0 ? 'None' : selectedFreqs.map(f => `${f}Hz (Width: ${(f/qValue).toFixed(1)}Hz)`).join('<br>');
                 }
                 if (lfoEnabled) txt += `<br><strong>LFO Mod:</strong> ${lfoWaveform} (${lfoPeriod}s)`;
                 rangeDisplay.innerHTML = txt;
@@ -809,7 +840,7 @@
             modeBtns.forEach(btn => btn.addEventListener('click', function() {
                 currentMode = this.getAttribute('data-mode');
                 syncUI();
-                if (isPlaying) { stop(); initAudioGraph(); } // Mode switch requires rebuild
+                if (isPlaying) { stop(); initAudioGraph(); }
             }));
             
             noiseBtns.forEach(btn => btn.addEventListener('click', function() {
@@ -818,7 +849,6 @@
                 if (isPlaying) { stop(); initAudioGraph(); }
             }));
 
-            // Zero-Dropout Frequency Toggling
             freqButtons.forEach(btn => btn.addEventListener('click', function() {
                 const f = parseInt(this.getAttribute('data-freq'));
                 if (this.classList.contains('active')) selectedFreqs = selectedFreqs.filter(v => v !== f);
@@ -826,6 +856,16 @@
                 syncUI();
                 if (isPlaying && currentMode !== 'sweep') syncActiveNodes(); 
             }));
+
+            addFreqBtn.addEventListener('click', () => {
+                const val = parseInt(manualFreqInput.value);
+                if (val > 0 && val <= 20000 && !selectedFreqs.includes(val)) {
+                    selectedFreqs.push(val);
+                    manualFreqInput.value = '';
+                    syncUI();
+                    if (isPlaying && currentMode !== 'sweep') syncActiveNodes();
+                }
+            });
             
             sweepTimeInput.addEventListener('input', function() {
                 sweepTime = parseFloat(this.value);
@@ -852,7 +892,6 @@
                 if (lfoOsc) updateLFOParams();
             });
 
-            // Smooth Slider Updates
             gainSlider.addEventListener('input', function() {
                 if (gainNode) {
                     const val = parseFloat(this.value);
@@ -877,12 +916,63 @@
                 saturationValue.textContent = this.value;
             });
 
-            qToggle.addEventListener('change', function() {
-                isNarrowQ = this.checked;
+            qSlider.addEventListener('input', function() {
+                qValue = parseFloat(this.value);
+                qValueDisplay.textContent = qValue.toFixed(1);
                 if (Object.keys(activeNodes).length > 0) {
-                    Object.values(activeNodes).forEach(node => node.filter.Q.setTargetAtTime(isNarrowQ ? 20 : 1, audioCtx.currentTime, 0.01));
+                    Object.values(activeNodes).forEach(node => {
+                        if(node.filter) node.filter.Q.setTargetAtTime(qValue, audioCtx.currentTime, 0.01);
+                    });
                 }
-                syncUI();
+                updateRangeDisplay();
+            });
+
+            sleepTimerSelect.addEventListener('change', function() {
+                if (sleepTimerId) clearTimeout(sleepTimerId);
+                const mins = parseInt(this.value);
+                if (mins > 0) {
+                    statusDisplay.textContent = `Sleep timer set for ${mins} minutes.`;
+                    sleepTimerId = setTimeout(() => {
+                        stop();
+                        statusDisplay.textContent = 'Sleep timer ended. Audio stopped.';
+                        sleepTimerSelect.value = "0";
+                    }, mins * 60 * 1000);
+                } else {
+                    statusDisplay.textContent = '';
+                }
+            });
+
+            recordBtn.addEventListener('click', () => {
+                if (!isPlaying) return alert("Please start the audio engine before recording.");
+                if (!recording) {
+                    try {
+                        const dest = audioCtx.createMediaStreamDestination();
+                        masterCompressor.connect(dest);
+                        mediaRecorder = new MediaRecorder(dest.stream);
+                        recordedChunks = [];
+                        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                        mediaRecorder.onstop = e => {
+                            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = 'acoustic-sanctuary-recording.webm';
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+                        };
+                        mediaRecorder.start();
+                        recording = true;
+                        recordBtn.textContent = 'Stop Recording';
+                        recordBtn.classList.add('recording');
+                    } catch (e) { alert("Recording not supported on this browser."); }
+                } else {
+                    mediaRecorder.stop();
+                    recording = false;
+                    recordBtn.textContent = 'Start Recording';
+                    recordBtn.classList.remove('recording');
+                }
             });
 
             // Initial Boot
