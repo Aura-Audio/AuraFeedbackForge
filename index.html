@@ -118,28 +118,42 @@
         .lfo-rate-hz { font-size: 13px; color: #666; margin-top: 2px; }
 
         .auto-controls { background: #fff3e0; padding: 12px; border-radius: 5px; margin-top: 10px; border: 1px solid #ffe0b2; }
+        .auto-mode-selector { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+        .auto-mode-btn {
+            padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: bold;
+            background: #ffcc80; color: #4e342e; border: 2px solid transparent; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .auto-mode-btn.active {
+            background: #e65100; color: #fff; border-color: #bf360c;
+            box-shadow: 0 2px 6px rgba(230,81,0,0.3);
+        }
         .auto-steps {
-            display: flex; gap: 6px; justify-content: center; margin: 10px 0; flex-wrap: wrap;
+            display: flex; gap: 5px; justify-content: center; margin: 10px 0; flex-wrap: wrap;
         }
         .auto-step {
-            padding: 6px 14px; border-radius: 5px; font-size: 13px; font-weight: bold;
+            padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;
             background: #eee; color: #999; transition: all 0.15s ease;
-            border: 2px solid transparent; position: relative;
+            border: 2px solid transparent;
         }
         .auto-step.active {
             background: #e65100; color: #fff;
             border-color: #bf360c;
-            transform: scale(1.1);
+            transform: scale(1.08);
             box-shadow: 0 2px 8px rgba(230,81,0,0.4);
         }
         .auto-step .step-period {
-            display: block; font-size: 10px; font-weight: normal; opacity: 0.7; margin-top: 1px;
+            display: block; font-size: 9px; font-weight: normal; opacity: 0.7; margin-top: 1px;
         }
         .auto-total-time {
             font-size: 13px; color: #e65100; font-weight: bold; margin-top: 8px;
         }
         .auto-arrow {
-            display: flex; align-items: center; color: #bbb; font-size: 16px;
+            display: flex; align-items: center; color: #ccc; font-size: 14px;
+        }
+        .auto-step.random-past {
+            opacity: 0.5;
+            border-color: #ffe0b2;
         }
     </style>
 </head>
@@ -222,7 +236,7 @@
                     <button class="lfo-waveform-btn" data-waveform="square">Square</button>
                     <button class="lfo-waveform-btn" data-waveform="triangle">Triangle</button>
                     <button class="lfo-waveform-btn" data-waveform="sawtooth">Sawtooth</button>
-                    <button class="lfo-waveform-btn auto-btn" data-waveform="auto">Auto Sequence</button>
+                    <button class="lfo-waveform-btn auto-btn" data-waveform="auto">Auto</button>
                 </div>
 
                 <div id="manualRateControls">
@@ -235,15 +249,19 @@
                 </div>
 
                 <div id="autoControls" class="auto-controls" style="display: none;">
-                    <div style="font-weight: bold; font-size: 13px; color: #e65100; margin-bottom: 6px;">
-                        Automatic Rate Sequence
+                    <div style="font-weight: bold; font-size: 13px; color: #e65100; margin-bottom: 8px;">
+                        Automatic Rate Modulation
+                    </div>
+                    <div class="auto-mode-selector">
+                        <button class="auto-mode-btn active" data-automode="sequence">Sequence</button>
+                        <button class="auto-mode-btn" data-automode="random">Random</button>
                     </div>
                     <div class="auto-steps" id="autoStepsContainer"></div>
                     <div class="slider-container" style="margin-top:10px;">
                         <label for="autoDwellSlider">Dwell Time Per Step: <span id="autoDwellValue" style="font-size:15px;color:#e65100;font-weight:bold;">2.0</span>s</label>
-                        <input type="range" id="autoDwellSlider" min="0.3" max="10" value="2.0" step="0.1">
+                        <input type="range" id="autoDwellSlider" min="0.3" max="60" value="2.0" step="0.1">
                     </div>
-                    <div class="auto-total-time" id="autoTotalTime">Total loop: 16.0s</div>
+                    <div class="auto-total-time" id="autoTotalTime">Total loop: 20.0s (10 steps)</div>
                 </div>
             </div>
         </div>
@@ -340,12 +358,12 @@
     </div>
 
     <div class="info">
-        <h3>Auto Sequence Mode</h3>
+        <h3>Auto Rate Modulation</h3>
         <ul>
-            <li><strong>Auto Sequence</strong> cycles the LFO rate through 1 → 5 → 10 → 15 → 20 → 25 → 50 → 100 Hz, then loops back to 1 Hz. The waveform (sine/square/etc.) you selected remains active throughout.</li>
-            <li><strong>Dwell Time</strong> controls how many seconds the LFO holds at each rate before stepping to the next. Total loop = dwell × 8 steps.</li>
-            <li><strong>Audio-thread scheduled:</strong> All 8 frequency changes are pre-scheduled on the audio thread using <code>setValueAtTime</code>, so step transitions are sample-accurate regardless of JS timer jitter.</li>
-            <li><strong>Perceptual journey:</strong> 1 Hz is a slow breathing pulse. By 15–25 Hz you're in fast tremolo territory. At 50–100 Hz the modulation crosses into AM synthesis — expect metallic sidebands and ring-modulation timbres as the rate climbs.</li>
+            <li><strong>Sequence mode:</strong> Steps through 0.1 → 1 → 5 → 10 → 15 → 20 → 25 → 50 → 100 → 1000 Hz in order, then loops. 0.1 Hz is a 10-second breathing cycle. 1000 Hz (0.001s) is deep ring modulation — the modulator becomes a audible tone creating metallic sidebands.</li>
+            <li><strong>Random mode:</strong> Shuffles the 10 rates into a new random order each loop. Every rate plays once per loop, but the sequence is unpredictable. The step indicators highlight wherever the jump lands.</li>
+            <li><strong>Dwell Time:</strong> 0.3s to 60s per step. At 60s dwell the full sequence takes 10 minutes. All transitions are pre-scheduled on the audio thread for sample-accurate timing.</li>
+            <li><strong>Waveform:</strong> Sine/square/triangle/sawtooth selection applies to both sequence and random modes.</li>
         </ul>
     </div>
 
@@ -390,14 +408,17 @@
             let lfoWaveform = 'sine';
             let lfoPeriod = 2.0;
 
-            // ===== AUTO SEQUENCE STATE =====
-            let lfoAutoMode = false;
+            // ===== AUTO STATE =====
+            let lfoAutoMode = false;       // true when Auto button is active
+            let lfoAutoRandom = false;     // true = random, false = sequence
             let autoDwellTime = 2.0;
-            // 8 steps: 1 Hz slow breathing → 100 Hz deep AM synthesis
-            const AUTO_SEQUENCE = [1, 5, 10, 15, 20, 25, 50, 100];
+            // Full pool: 0.1 Hz (slow breathing) through 1000 Hz (deep ring mod)
+            const AUTO_POOL = [0.1, 1, 5, 10, 15, 20, 25, 50, 100, 1000];
             let autoLoopStartTime = 0;
             let autoScheduleTimeout = null;
             let autoUIRafId = null;
+            // Tracks which order the current loop is using (for UI highlight)
+            let currentLoopOrder = AUTO_POOL;
 
             // ===== LOGARITHMIC SLIDER =====
             const LFO_MIN_PERIOD = 0.001;
@@ -416,16 +437,21 @@
                 if (p >= 0.01) return p.toFixed(3) + 's';
                 return p.toFixed(4) + 's';
             }
+            function formatHz(hz) {
+                if (hz >= 1) return hz.toFixed(0) + ' Hz';
+                return hz.toFixed(1) + ' Hz';
+            }
             function getLfoRateHz(p) { return 1 / p; }
 
             const factoryPresets = {
-                "Standard: Pure White (Static Mask)": { mode: "noise", noiseType: "white", freqs: [20, 50, 100, 500, 1000, 4000, 8000], qValue: 1.0, gain: 0.4, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
-                "Standard: Pure Pink (Focus)": { mode: "noise", noiseType: "pink", freqs: [20, 80, 200, 500, 1000, 3000], qValue: 1.0, gain: 0.5, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
-                "Standard: Deep Brown (Sleep)": { mode: "noise", noiseType: "brown", freqs: [20, 40, 60, 80, 125], qValue: 1.0, gain: 0.6, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
-                "White: Tinnitus Sanctuary": { mode: "noise", noiseType: "white", freqs: [6000, 8000], qValue: 20.0, gain: 0.3, feedback: 0.5, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 20 },
-                "White: Brainstorm Sizzle": { mode: "noise", noiseType: "white", freqs: [2000, 3000, 4000], qValue: 15.0, gain: 0.35, feedback: 0.3, lfoEnabled: true, lfoWaveform: "square", lfoPeriod: 0.2, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 10 },
-                "Pink: Oceanic Pulse": { mode: "noise", noiseType: "pink", freqs: [100, 200, 500], qValue: 10.0, gain: 0.5, feedback: 0.6, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 6.0, lfoAutoMode: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 30 },
-                "Auto: Full AM Synthesis Tour": { mode: "sine", noiseType: "white", freqs: [500, 1000], qValue: 1.0, gain: 0.5, feedback: 0.2, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 0.2, lfoAutoMode: true, autoDwellTime: 3.0, sweepTime: 5.0, sat: 0 }
+                "Standard: Pure White (Static Mask)": { mode: "noise", noiseType: "white", freqs: [20, 50, 100, 500, 1000, 4000, 8000], qValue: 1.0, gain: 0.4, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
+                "Standard: Pure Pink (Focus)": { mode: "noise", noiseType: "pink", freqs: [20, 80, 200, 500, 1000, 3000], qValue: 1.0, gain: 0.5, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
+                "Standard: Deep Brown (Sleep)": { mode: "noise", noiseType: "brown", freqs: [20, 40, 60, 80, 125], qValue: 1.0, gain: 0.6, feedback: 0.0, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 0 },
+                "White: Tinnitus Sanctuary": { mode: "noise", noiseType: "white", freqs: [6000, 8000], qValue: 20.0, gain: 0.3, feedback: 0.5, lfoEnabled: false, lfoWaveform: "sine", lfoPeriod: 2.0, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 20 },
+                "White: Brainstorm Sizzle": { mode: "noise", noiseType: "white", freqs: [2000, 3000, 4000], qValue: 15.0, gain: 0.35, feedback: 0.3, lfoEnabled: true, lfoWaveform: "square", lfoPeriod: 0.2, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 10 },
+                "Pink: Oceanic Pulse": { mode: "noise", noiseType: "pink", freqs: [100, 200, 500], qValue: 10.0, gain: 0.5, feedback: 0.6, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 6.0, lfoAutoMode: false, lfoAutoRandom: false, autoDwellTime: 2.0, sweepTime: 5.0, sat: 30 },
+                "Auto: Full Modulation Tour": { mode: "sine", noiseType: "white", freqs: [500, 1000], qValue: 1.0, gain: 0.5, feedback: 0.2, lfoEnabled: true, lfoWaveform: "sine", lfoPeriod: 0.2, lfoAutoMode: true, lfoAutoRandom: false, autoDwellTime: 3.0, sweepTime: 5.0, sat: 0 },
+                "Auto: Random AM Scatter": { mode: "noise", noiseType: "pink", freqs: [200, 500, 1000], qValue: 5.0, gain: 0.4, feedback: 0.3, lfoEnabled: true, lfoWaveform: "triangle", lfoPeriod: 0.2, lfoAutoMode: true, lfoAutoRandom: true, autoDwellTime: 2.0, sweepTime: 5.0, sat: 15 }
             };
 
             // ----- DOM -----
@@ -459,6 +485,7 @@
             const lfoLabel = document.getElementById('lfoLabel');
             const lfoSettingsDiv = document.getElementById('lfoSettings');
             const lfoBtns = document.querySelectorAll('.lfo-waveform-btn');
+            const autoModeBtns = document.querySelectorAll('.auto-mode-btn');
             const manualRateControls = document.getElementById('manualRateControls');
             const lfoPeriodSlider = document.getElementById('lfoPeriodSlider');
             const lfoPeriodValue = document.getElementById('lfoPeriodValue');
@@ -507,10 +534,22 @@
             }
             window.addEventListener('resize', () => { if (canvasCtx) resizeCanvas(); });
 
+            // Fisher-Yates shuffle
+            function shuffleArray(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
             // ----- BUILD AUTO STEP INDICATORS -----
+            // Shows all 10 pool frequencies in ascending order (always same layout)
+            // Highlight jumps to whichever is currently playing
             function buildAutoStepIndicators() {
                 autoStepsContainer.innerHTML = '';
-                AUTO_SEQUENCE.forEach((hz, i) => {
+                AUTO_POOL.forEach((hz, i) => {
                     if (i > 0) {
                         const arrow = document.createElement('span');
                         arrow.className = 'auto-arrow';
@@ -520,7 +559,7 @@
                     const step = document.createElement('div');
                     step.className = 'auto-step';
                     step.id = 'autoStep' + i;
-                    step.innerHTML = hz + ' Hz<span class="step-period">' + formatPeriod(1/hz) + '</span>';
+                    step.innerHTML = formatHz(hz) + '<span class="step-period">' + formatPeriod(1/hz) + '</span>';
                     autoStepsContainer.appendChild(step);
                 });
             }
@@ -529,28 +568,41 @@
             function updateAutoStepHighlight() {
                 if (!lfoAutoMode || !audioCtx) return;
                 const elapsed = audioCtx.currentTime - autoLoopStartTime;
-                const totalLoopDur = AUTO_SEQUENCE.length * autoDwellTime;
+                const totalLoopDur = currentLoopOrder.length * autoDwellTime;
                 let pos = elapsed % totalLoopDur;
                 if (pos < 0) pos += totalLoopDur;
-                const stepIndex = Math.floor(pos / autoDwellTime) % AUTO_SEQUENCE.length;
-                AUTO_SEQUENCE.forEach((_, i) => {
+                const stepIndex = Math.floor(pos / autoDwellTime) % currentLoopOrder.length;
+                const currentHz = currentLoopOrder[stepIndex];
+
+                // Highlight by matching frequency value — works for both sequence and random
+                AUTO_POOL.forEach((hz, i) => {
                     const el = document.getElementById('autoStep' + i);
-                    if (el) el.classList.toggle('active', i === stepIndex);
+                    if (!el) return;
+                    const isCurrent = (hz === currentHz);
+                    el.classList.toggle('active', isCurrent);
+                    // In random mode, dim steps that already played in this loop
+                    if (lfoAutoRandom) {
+                        const currentIdx = currentLoopOrder.indexOf(currentHz);
+                        const poolIdx = currentLoopOrder.indexOf(hz);
+                        el.classList.toggle('random-past', !isCurrent && poolIdx >= 0 && poolIdx < currentIdx);
+                    } else {
+                        el.classList.remove('random-past');
+                    }
                 });
             }
 
-            // ----- LFO RATE WARNING (manual mode only) -----
+            // ----- LFO RATE WARNING -----
             function updateLfoRateWarning(period) {
                 const hz = getLfoRateHz(period);
-                lfoRateHz.textContent = hz >= 100 ? hz.toFixed(0) + ' Hz' : hz >= 1 ? hz.toFixed(1) + ' Hz' : hz.toFixed(2) + ' Hz';
+                lfoRateHz.textContent = formatHz(hz);
                 if (hz >= 20) {
                     lfoRateWarning.className = 'lfo-rate-warning warn-rm';
                     lfoRateWarning.style.display = 'block';
-                    lfoRateWarning.textContent = 'AM Synthesis zone (' + hz.toFixed(0) + ' Hz) — audible sidebands, ring-modulation timbres.';
+                    lfoRateWarning.textContent = 'AM Synthesis zone (' + formatHz(hz) + ') — audible sidebands, ring-modulation timbres.';
                 } else if (hz >= 5) {
                     lfoRateWarning.className = 'lfo-rate-warning warn-am';
                     lfoRateWarning.style.display = 'block';
-                    lfoRateWarning.textContent = 'Fast tremolo (' + hz.toFixed(1) + ' Hz) — approaching perception limit.';
+                    lfoRateWarning.textContent = 'Fast tremolo (' + formatHz(hz) + ') — approaching perception limit.';
                 } else {
                     lfoRateWarning.style.display = 'none';
                 }
@@ -608,6 +660,7 @@
                 manualRateControls.style.display = lfoAutoMode ? 'none' : 'block';
                 autoControlsDiv.style.display = lfoAutoMode ? 'block' : 'none';
 
+                // Waveform buttons
                 lfoBtns.forEach(b => {
                     if (b.dataset.waveform === 'auto') {
                         b.classList.toggle('active', lfoAutoMode);
@@ -616,16 +669,23 @@
                     }
                 });
 
+                // Auto mode sub-buttons (sequence vs random)
+                autoModeBtns.forEach(b => {
+                    b.classList.toggle('active', b.dataset.automode === (lfoAutoRandom ? 'random' : 'sequence'));
+                });
+
+                // Manual slider
                 lfoPeriodSlider.value = periodToSlider(lfoPeriod);
                 lfoPeriodValue.textContent = formatPeriod(lfoPeriod);
                 updateLfoRateWarning(lfoPeriod);
 
+                // Auto controls
                 autoDwellSlider.value = autoDwellTime;
                 autoDwellValue.textContent = autoDwellTime.toFixed(1);
-                autoTotalTime.textContent = 'Total loop: ' + (autoDwellTime * AUTO_SEQUENCE.length).toFixed(1) + 's (' + AUTO_SEQUENCE.length + ' steps)';
-                AUTO_SEQUENCE.forEach((_, i) => {
+                autoTotalTime.textContent = 'Total loop: ' + (autoDwellTime * AUTO_POOL.length).toFixed(1) + 's (' + AUTO_POOL.length + ' steps)';
+                AUTO_POOL.forEach((_, i) => {
                     const el = document.getElementById('autoStep' + i);
-                    if (el) el.classList.remove('active');
+                    if (el) { el.classList.remove('active'); el.classList.remove('random-past'); }
                 });
 
                 sweepTimeInput.value = sweepTime;
@@ -641,10 +701,11 @@
                 if (!lfoEnabled) {
                     lfoInfo = 'Master Level (static: ' + gainSlider.value + ')';
                 } else if (lfoAutoMode) {
-                    lfoInfo = 'Master Level + AUTO ' + AUTO_SEQUENCE.join('→') + ' Hz (' + autoDwellTime.toFixed(1) + 's/step)';
+                    const modeLabel = lfoAutoRandom ? 'RANDOM' : 'SEQ';
+                    lfoInfo = 'Master Level + AUTO ' + modeLabel + ' ' + AUTO_POOL.map(formatHz).join('→') + ' (' + autoDwellTime.toFixed(1) + 's/step)';
                 } else {
                     const hz = getLfoRateHz(lfoPeriod);
-                    lfoInfo = 'Master Level + LFO ' + lfoWaveform + ' ' + formatPeriod(lfoPeriod) + ' (' + (hz >= 1 ? hz.toFixed(0) : hz.toFixed(2)) + ' Hz)';
+                    lfoInfo = 'Master Level + LFO ' + lfoWaveform + ' ' + formatPeriod(lfoPeriod) + ' (' + formatHz(hz) + ')';
                 }
                 el.innerHTML =
                     `<span class="stage stage-gen">${genName}</span> → ` +
@@ -660,7 +721,7 @@
                 const obj = {
                     mode: currentMode, noiseType, freqs: [...selectedFreqs], qValue,
                     gain: parseFloat(gainSlider.value), feedback: parseFloat(feedbackSlider.value),
-                    lfoEnabled, lfoWaveform, lfoPeriod, lfoAutoMode, autoDwellTime,
+                    lfoEnabled, lfoWaveform, lfoPeriod, lfoAutoMode, lfoAutoRandom, autoDwellTime,
                     sweepTime, sat: parseFloat(saturationSlider.value)
                 };
                 let up = JSON.parse(localStorage.getItem('fbForgePresets')) || {};
@@ -689,6 +750,7 @@
                     lfoWaveform = d.lfoWaveform || 'sine';
                     lfoPeriod = d.lfoPeriod !== undefined ? d.lfoPeriod : 2.0;
                     lfoAutoMode = d.lfoAutoMode || false;
+                    lfoAutoRandom = d.lfoAutoRandom || false;
                     autoDwellTime = d.autoDwellTime !== undefined ? d.autoDwellTime : 2.0;
                     sweepTime = d.sweepTime || 5.0;
                     syncUI();
@@ -896,7 +958,8 @@
 
             // ===================================================================
             // LFO — modulates masterLevel.gain only
-            // Auto mode: pre-schedules all 8 frequency changes on audio thread
+            // Auto: pre-schedules all 10 frequency changes on audio thread
+            // Random: generates a new shuffled order each loop
             // ===================================================================
             function startLFO() {
                 if (!audioCtx || !masterLevel || lfoOsc) return;
@@ -917,10 +980,11 @@
                 lfoOffsetNode.start();
 
                 if (lfoAutoMode) {
-                    // Set initial frequency and schedule all 8 steps
-                    lfoOsc.frequency.setValueAtTime(AUTO_SEQUENCE[0], audioCtx.currentTime);
+                    // Set initial frequency then schedule full sequence/random loop
+                    const firstHz = lfoAutoRandom ? shuffleArray(AUTO_POOL)[0] : AUTO_POOL[0];
+                    lfoOsc.frequency.setValueAtTime(firstHz, audioCtx.currentTime);
                     lfoOsc.start();
-                    scheduleAutoSequence();
+                    scheduleAutoLoop();
                     startAutoUI();
                 } else {
                     lfoOsc.frequency.setValueAtTime(getLfoRateHz(lfoPeriod), audioCtx.currentTime);
@@ -959,18 +1023,26 @@
             }
 
             // ===================================================================
-            // AUTO SEQUENCE ENGINE
-            // Pre-schedules all 8 frequency changes on the audio thread
-            // for sample-accurate step transitions
+            // AUTO LOOP ENGINE
+            // Pre-schedules all 10 frequency changes on the audio thread
+            // Sequence: 0.1→1→5→10→15→20→25→50→100→1000 Hz
+            // Random: shuffled order, new shuffle each loop
             // ===================================================================
-            function scheduleAutoSequence() {
+            function scheduleAutoLoop() {
                 if (!lfoOsc || !audioCtx || !lfoAutoMode) return;
 
                 const t0 = audioCtx.currentTime + 0.02;
                 let t = t0;
 
-                // Pre-schedule all 8 frequency changes on the audio thread
-                AUTO_SEQUENCE.forEach(hz => {
+                // Determine the order for this loop
+                if (lfoAutoRandom) {
+                    currentLoopOrder = shuffleArray(AUTO_POOL);
+                } else {
+                    currentLoopOrder = AUTO_POOL;
+                }
+
+                // Pre-schedule all 10 frequency changes on the audio thread
+                currentLoopOrder.forEach(hz => {
                     lfoOsc.frequency.setValueAtTime(hz, t);
                     t += autoDwellTime;
                 });
@@ -978,13 +1050,13 @@
                 autoLoopStartTime = t0;
 
                 // Schedule the next loop batch 200ms before this one ends
-                const totalDuration = AUTO_SEQUENCE.length * autoDwellTime;
+                const totalDuration = currentLoopOrder.length * autoDwellTime;
                 const leadTime = 0.2;
                 const jsDelay = Math.max(0.05, (totalDuration - leadTime)) * 1000;
 
                 autoScheduleTimeout = setTimeout(() => {
                     if (lfoEnabled && lfoAutoMode && isPlaying && lfoOsc) {
-                        scheduleAutoSequence();
+                        scheduleAutoLoop();
                     }
                 }, jsDelay);
             }
@@ -1011,9 +1083,9 @@
                     cancelAnimationFrame(autoUIRafId);
                     autoUIRafId = null;
                 }
-                AUTO_SEQUENCE.forEach((_, i) => {
+                AUTO_POOL.forEach((_, i) => {
                     const el = document.getElementById('autoStep' + i);
-                    if (el) el.classList.remove('active');
+                    if (el) { el.classList.remove('active'); el.classList.remove('random-past'); }
                 });
             }
 
@@ -1077,10 +1149,11 @@
                 }
                 if (lfoEnabled) {
                     if (lfoAutoMode) {
-                        t += `<br><strong>LFO:</strong> AUTO ${AUTO_SEQUENCE.join('→')} Hz — ${autoDwellTime.toFixed(1)}s/step — ${lfoWaveform} — post-mix`;
+                        const modeStr = lfoAutoRandom ? 'RANDOM' : 'SEQUENCE';
+                        t += `<br><strong>LFO:</strong> AUTO ${modeStr} — ${AUTO_POOL.map(formatHz).join('→')} Hz — ${autoDwellTime.toFixed(1)}s/step — ${lfoWaveform}`;
                     } else {
                         const hz = getLfoRateHz(lfoPeriod);
-                        t += `<br><strong>LFO:</strong> ${lfoWaveform} — ${formatPeriod(lfoPeriod)} (${hz >= 1 ? hz.toFixed(0) : hz.toFixed(2)} Hz) — post-mix`;
+                        t += `<br><strong>LFO:</strong> ${lfoWaveform} — ${formatPeriod(lfoPeriod)} (${formatHz(hz)}) — post-mix`;
                     }
                 }
                 rangeDisplay.innerHTML = t;
@@ -1129,6 +1202,7 @@
                 updateRangeDisplay();
             });
 
+            // --- LFO Waveform buttons (including Auto) ---
             lfoBtns.forEach(b => b.addEventListener('click', function() {
                 const wf = this.dataset.waveform;
                 if (wf === 'auto') {
@@ -1143,6 +1217,20 @@
                 if (lfoEnabled && isPlaying) updateLFOParams();
             }));
 
+            // --- Auto sub-mode: Sequence vs Random ---
+            autoModeBtns.forEach(b => b.addEventListener('click', function() {
+                lfoAutoRandom = this.dataset.automode === 'random';
+                syncUI();
+                updateSignalFlowDisplay();
+                updateRangeDisplay();
+                // Reschedule with new mode if playing
+                if (lfoEnabled && isPlaying && lfoAutoMode && lfoOsc) {
+                    stopAutoSequence();
+                    scheduleAutoLoop();
+                }
+            }));
+
+            // --- Manual period slider ---
             lfoPeriodSlider.addEventListener('input', function() {
                 const sliderVal = parseInt(this.value);
                 lfoPeriod = sliderToPeriod(sliderVal);
@@ -1155,15 +1243,16 @@
                 }
             });
 
+            // --- Auto dwell time slider ---
             autoDwellSlider.addEventListener('input', function() {
                 autoDwellTime = parseFloat(this.value);
                 autoDwellValue.textContent = autoDwellTime.toFixed(1);
-                autoTotalTime.textContent = 'Total loop: ' + (autoDwellTime * AUTO_SEQUENCE.length).toFixed(1) + 's (' + AUTO_SEQUENCE.length + ' steps)';
+                autoTotalTime.textContent = 'Total loop: ' + (autoDwellTime * AUTO_POOL.length).toFixed(1) + 's (' + AUTO_POOL.length + ' steps)';
                 updateRangeDisplay();
                 updateSignalFlowDisplay();
                 if (lfoEnabled && isPlaying && lfoAutoMode && lfoOsc) {
                     stopAutoSequence();
-                    scheduleAutoSequence();
+                    scheduleAutoLoop();
                 }
             });
 
